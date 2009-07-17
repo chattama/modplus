@@ -78,6 +78,7 @@ public:
 protected:
 	LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	LRESULT MainWndProc( UINT msg, WPARAM wParam, LPARAM lParam);
+	LRESULT MainWndProcMod( UINT msg, WPARAM wParam, LPARAM lParam, bool& isBreak);
 	LRESULT DubWndProc(UINT msg, WPARAM wParam, LPARAM lParam);
 	void OnSize();
 	void HandleDragDrop(HDROP hdrop);

@@ -2,6 +2,8 @@
 // Microsoft Visual C++ generated include file.
 // Used by VirtualDub.rc
 //
+#include "../mod/h/resource.h"
+
 #define IDC_HELP2                       0
 #define IDS_TITLE_INITIAL               1
 #define IDS_TITLE_NOFILE                2

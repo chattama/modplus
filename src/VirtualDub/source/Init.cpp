@@ -68,6 +68,8 @@
 #include "capture.h"
 #include "captureui.h"
 
+#include "modplus.h"
+
 #ifdef _DEBUG
 	#define VD_GENERIC_BUILD_NAMEW	L"debug"
 	#define VD_BUILD_NAMEW			L"debug"
@@ -422,6 +424,7 @@ bool Init(HINSTANCE hInstance, int nCmdShow, VDCommandLine& cmdLine) {
 	VDLoadFilespecSystemData();
 
 	LoadPreferences();
+	LoadPreferencesMod();
 	{
 		VDRegistryAppKey key("Preferences");
 		unsigned errorMode;
@@ -560,6 +563,8 @@ void Deinit() {
 
 	AVIFileExit();
 
+	DeinitMod();
+
 	_CrtCheckMemory();
 
 	VDCHECKPOINT;
@@ -597,6 +602,8 @@ bool InitApplication(HINSTANCE hInstance) {
 
 	extern bool VDRegisterParameterCurveControl();
 	if (!VDRegisterParameterCurveControl()) return false;
+
+	InitApplicationMod(hInstance);
 
 	return true;
 }

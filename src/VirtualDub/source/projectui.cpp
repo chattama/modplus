@@ -52,6 +52,8 @@
 #include "InputFile.h"
 #include "VideoWindow.h"
 
+#include "modplus.h"
+
 ///////////////////////////////////////////////////////////////////////////
 
 namespace {
@@ -1299,6 +1301,8 @@ bool VDProjectUI::MenuHit(UINT id) {
 		case ID_DUBINPROGRESS_ABORT:			AbortOperation();			break;
 
 		default:
+			if (MenuHitMod((HWND)mhwnd, id)) break;
+
 			if (id >= ID_MRU_FILE0 && id <= ID_MRU_FILE3) {
 				const int index = id - ID_MRU_FILE0;
 				VDStringW name(mMRUList[index]);
@@ -1309,6 +1313,8 @@ bool VDProjectUI::MenuHit(UINT id) {
 					VDAutoLogDisplay logDisp;
 					g_project->Open(name.c_str(), NULL, bExtendedOpen, false, true);
 					logDisp.Post(mhwnd);
+
+					AVSViewerOpen((HWND)mhwnd);
 				}
 				break;
 			}
@@ -1669,6 +1675,15 @@ LRESULT VDProjectUI::MainWndProc( UINT msg, WPARAM wParam, LPARAM lParam) {
 			pDisp->Cache();
 		}
 		break;
+
+	default:
+		{
+			bool b;
+			LRESULT r = MainWndProcMod(msg, wParam, lParam, b);
+			if (!b) return r;
+			break;
+		}
+		break;
 	}
 
 	return VDUIFrame::GetFrame((HWND)mhwnd)->DefProc((HWND)mhwnd, msg, wParam, lParam);
@@ -1782,6 +1797,8 @@ void VDProjectUI::HandleDragDrop(HDROP hdrop) {
 			Open(filename.c_str(), NULL, false);
 
 			logDisp.Post(mhwnd);
+
+			AVSViewerOpen((HWND)mhwnd);
 		} catch(const MyError& e) {
 			e.post((HWND)mhwnd, g_szError);
 		}

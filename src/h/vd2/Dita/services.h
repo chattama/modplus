@@ -32,6 +32,7 @@ struct VDFileDialogOption {
 		kBool,
 		kInt,
 		kEnabledInt,
+		kComboBox,
 		kReadOnly,
 		kSelectedFilter
 	};

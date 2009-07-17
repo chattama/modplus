@@ -1,14 +1,10 @@
-<?xml version="1.0" encoding="Windows-1252"?>
+<?xml version="1.0" encoding="shift_jis"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
 	Name="helpfile"
 	ProjectGUID="{034CFB04-D0EC-4CBB-BCA6-EFD8F964E9DE}"
 	RootNamespace="helpfile"
-	SccProjectName="SAK"
-	SccAuxPath="SAK"
-	SccLocalPath="SAK"
-	SccProvider="SAK"
 	Keyword="MakeFileProj"
 	>
 	<Platforms>

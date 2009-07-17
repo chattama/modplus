@@ -35,6 +35,7 @@
 #include "dub.h"
 #include "dubstatus.h"
 #include "prefs.h"
+#include "modplus.h"
 
 extern HINSTANCE g_hInst;
 
@@ -357,7 +358,8 @@ public:
 class VDDialogPreferences : public VDDialogBase {
 public:
 	VDPreferences2& mPrefs;
-	VDDialogPreferences(VDPreferences2& p) : mPrefs(p) {}
+	VDubModPreferences2& mPrefsMod;
+	VDDialogPreferences(VDPreferences2& p, VDubModPreferences2& m) : mPrefs(p), mPrefsMod(m) {}
 
 	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
 		if (type == kEventAttach) {
@@ -377,6 +379,8 @@ public:
 				case 5:	pSubDialog->SetCallback(new VDDialogPreferencesTimeline(mPrefs), true); break;
 				case 6:	pSubDialog->SetCallback(new VDDialogPreferencesDub(mPrefs), true); break;
 				case 7:	pSubDialog->SetCallback(new VDDialogPreferencesDiskIO(mPrefs), true); break;
+				case 8:	pSubDialog->SetCallback(new VDDialogPrefsScriptEditor(mPrefsMod), true); break;
+				case 9:	pSubDialog->SetCallback(new VDDialogPrefsScriptEditorKeys(mPrefsMod), true); break;
 				}
 			}
 		} else if (type == kEventSelect) {
@@ -393,6 +397,7 @@ public:
 					pSubDialog->DispatchEvent(vdpoly_cast<IVDUIWindow *>(mpBase), 0, IVDUICallback::kEventSync, 0);
 
 				VDSavePreferences(mPrefs);
+				VDMSavePreferences(mPrefsMod);
 			}
 		}
 		return false;
@@ -402,9 +407,14 @@ public:
 void VDShowPreferencesDialog(VDGUIHandle h) {
 	vdrefptr<IVDUIWindow> peer(VDUICreatePeer(h));
 
+	VDubModPreferences2 mod(g_VDMPrefs2);
+	mod.mModPrefs = g_VDMPrefs;
+	mod.mKeytableAVS = g_accelAVS;
+
 	vdrefptr<IVDUIWindow> pWin(VDCreateDialogFromResource(1000, peer));
 	VDPreferences2 temp(g_prefs2);
-	VDDialogPreferences prefDlg(temp);
+
+	VDDialogPreferences prefDlg(temp, mod);
 
 	IVDUIBase *pBase = vdpoly_cast<IVDUIBase *>(pWin);
 	
@@ -417,7 +427,13 @@ void VDShowPreferencesDialog(VDGUIHandle h) {
 	if (result) {
 		g_prefs2 = temp;
 		g_prefs = g_prefs2.mOldPrefs;
+
+		g_VDMPrefs2 = mod;
+		g_VDMPrefs = mod.mModPrefs;
+		g_accelAVS = mod.mKeytableAVS;
+
 		VDPreferencesUpdated();
+		VDMPreferencesUpdated();
 	}
 }
 
@@ -487,6 +503,7 @@ void VDSavePreferences(VDPreferences2& prefs) {
 
 void VDSavePreferences() {
 	VDSavePreferences(g_prefs2);
+	VDMSavePreferences(g_VDMPrefs2);
 }
 
 const VDStringW& VDPreferencesGetTimelineFormat() {

@@ -215,6 +215,8 @@ BEGIN
     POPUP "&Tools"
     BEGIN
         MENUITEM "&Hex editor...",              ID_TOOLS_HEXVIEWER
+        MENUITEM "&Script editor...\tCtrl+E",   ID_TOOLS_AVS
+        MENUITEM SEPARATOR
         MENUITEM "&Create sparse AVI...",       ID_TOOLS_CREATESPARSEAVI
         MENUITEM "&Expand sparse AVI...",       ID_TOOLS_EXPANDSPARSEAVI
         MENUITEM "Benchmark resampler",         ID_TOOLS_BENCHMARKRESAMPLER
@@ -610,6 +612,61 @@ BEGIN
             MENUITEM "6 dB",                        ID_AUDIODISPLAY_BOOST_6DB,MFT_STRING | MFT_RIGHTJUSTIFY,MFS_ENABLED
             MENUITEM "0 dB",                        ID_AUDIODISPLAY_BOOST_0DB,MFT_STRING,MFS_ENABLED
         END
+    END
+END
+
+IDR_AVSVIEWER_MENU MENU 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New...",				ID_FILE_NEW
+        MENUITEM "&Open...",			ID_FILE_OPEN
+        MENUITEM "&Save...",		ID_AVS_FILE_SAVE
+        MENUITEM "Save && &Refresh...",		ID_REFRESH
+        MENUITEM "Save && Open as &AVI...",	ID_AVS_SAVE_OPEN
+        MENUITEM "Re&vert",						ID_FILE_REVERT
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit...",			ID_FILE_EXIT
+    END
+    POPUP "&Edit"
+    BEGIN
+        MENUITEM "&Undo...",					ID_EDIT_UNDO
+        MENUITEM "&Redo...",					ID_EDIT_REDO
+        MENUITEM SEPARATOR
+        MENUITEM "&Find...",					ID_EDIT_FIND
+        MENUITEM "Find next...",				ID_EDIT_FINDNEXT
+        MENUITEM "Find prev...",				ID_EDIT_FINDPREV
+        MENUITEM SEPARATOR
+        MENUITEM "Insert &Position...",			ID_AVS_INSERT_POS
+        MENUITEM "Insert R&ange...",			ID_AVS_INSERT_RANGE
+        MENUITEM "Insert &Trim With Range...", 
+                                                ID_AVS_INSERT_TRIM
+        MENUITEM "Import &Frameset as Trims...", 
+                                                ID_AVS_INSERT_FRAMESET
+        MENUITEM "Insert Filename...", 
+                                                ID_AVS_INSERT_FILENAME
+        MENUITEM "Insert Crop",					ID_AVS_INSERT_CROP
+        MENUITEM SEPARATOR
+        MENUITEM "&Comment Selected Lines...", 
+                                                ID_AVS_COMMENT_LINES
+        MENUITEM "U&ncomment Selected Lines...", 
+                                                ID_AVS_UNCOMMENT_LINES
+        MENUITEM SEPARATOR
+        MENUITEM "&Line Numbers",				ID_AVS_EDIT_LINE, CHECKED
+        POPUP "&Script Handling"
+        BEGIN
+            MENUITEM "&None...",				ID_AVS_SCRIPT_NONE
+            MENUITEM "&AviSynth...",			ID_AVS_SCRIPT_AVS, CHECKED
+            MENUITEM "&Decomb...",				ID_AVS_SCRIPT_DECOMB
+        END
+        MENUITEM "&Options",					ID_AVS_EDIT_OPTIONS, GRAYED
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "Keyboard commands...",		ID_HELP_KEYS
+        MENUITEM "[Toff]s Tweaking Mod",		ID_HELP_TOFF
+        MENUITEM SEPARATOR
+        MENUITEM "&AviSynth Information",		ID_HELP_AVISYNTH
     END
 END
 
@@ -2395,6 +2452,50 @@ BEGIN
     PUSHBUTTON      "Cancel",IDCANCEL,129,61,50,14
 END
 
+IDD_FIND DIALOG 30, 73, 275, 84
+STYLE DS_SETFONT | DS_MODALFRAME | DS_3DLOOK | DS_CENTER | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Find"
+FONT 9, "MS Shell Dlg"
+BEGIN
+	LTEXT           "Fi&nd what:",-1,5,7,45,8
+	EDITTEXT        ID_FIND_FINDWHAT,50,5,145,14, WS_TABSTOP | ES_AUTOHSCROLL
+//	COMBOBOX        ID_FIND_FINDWHAT,50,5,145,50, WS_TABSTOP | CBS_DROPDOWN | CBS_AUTOHSCROLL
+	AUTOCHECKBOX    "Match &whole word only", ID_FIND_WHOLEWORD,5,22,120,10, WS_GROUP | WS_TABSTOP
+	AUTOCHECKBOX    "Match &case", ID_FIND_MATCHCASE,5,34,130,10, WS_TABSTOP
+	AUTOCHECKBOX    "Regular &expression", ID_FIND_REGEXP,5,46,120,10, WS_TABSTOP
+	AUTOCHECKBOX    "Wrap ar&ound", ID_FIND_WRAP,5,58,120,10, WS_TABSTOP
+	AUTOCHECKBOX    "Transform &backslash expressions", ID_FIND_UNSLASH,5,70,160,10, WS_TABSTOP
+	GROUPBOX        "Direction", -1, 135,22,60,34,WS_GROUP
+	AUTORADIOBUTTON "&Up",ID_FIND_DIRECTIONUP,140,30,45,12, WS_GROUP
+	AUTORADIOBUTTON "&Down",ID_FIND_DIRECTIONDOWN,140,42,45,12
+	DEFPUSHBUTTON   "&Find Next",IDOK,205,5,65,14,WS_GROUP
+	PUSHBUTTON      "&Mark All",ID_FIND_MARKALL,205,23,65,14,WS_DISABLED
+	PUSHBUTTON      "Close",IDCANCEL,205,41,65,14
+END
+
+IDD_REPLACE DIALOGEX 36, 44, 285, 110
+STYLE DS_MODALFRAME | DS_3DLOOK | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Replace"
+FONT 8, "MS Shell Dlg"
+BEGIN
+	LTEXT           "Fi&nd what:",-1,5,7,55,8
+	COMBOBOX        ID_FIND_FINDWHAT,60,5,125,50,WS_TABSTOP | CBS_DROPDOWN | CBS_AUTOHSCROLL
+	LTEXT           "Re&place with:",-1,5,25,55,8
+	COMBOBOX        ID_FIND_REPLACEWITH,60,23,125,50,WS_TABSTOP | CBS_DROPDOWN | CBS_AUTOHSCROLL
+	AUTOCHECKBOX    "Match &whole word only", ID_FIND_WHOLEWORD,5,42,130,10, WS_GROUP | WS_TABSTOP
+	AUTOCHECKBOX    "Match &case", ID_FIND_MATCHCASE,5,54,130,10, WS_TABSTOP
+	AUTOCHECKBOX    "Regular &expression", ID_FIND_REGEXP,5,66,120,10, WS_TABSTOP
+	AUTOCHECKBOX    "Wrap ar&ound", ID_FIND_WRAP,5,78,120,10, WS_TABSTOP
+	AUTOCHECKBOX    "Transform &backslash expressions", ID_FIND_UNSLASH,5,90,150,10, WS_TABSTOP
+	DEFPUSHBUTTON   "&Find Next",IDOK,190,5,90,14,WS_GROUP
+	PUSHBUTTON      "&Replace",ID_FIND_REPLACE,190,23,90,14
+	PUSHBUTTON      "Replace &All",ID_FIND_REPLACEALL,190,41,90,14
+	PUSHBUTTON      "Replace in &Selection",ID_FIND_REPLACEINSEL,190,59,90,14
+	PUSHBUTTON      "Close",IDCANCEL,190,77,90,14
+	LTEXT           "Replacements:",-1,190,96,55,8
+	LTEXT           "1234567",ID_FIND_REPLDONE,250,96,30,8,NOT WS_GROUP
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -3303,6 +3404,11 @@ IDR_RELEASE_NOTES       STUFF                   "rel_notes.bin"
 IDR_CREDITS             STUFF                   "credits.txt"
 IDR_VIRUS               STUFF                   "license.bin"
 
+IDR_SCI_INTERNAL        STUFF   DISCARDABLE     "Internal.bin"
+IDR_SCI_EXTERNAL        STUFF   DISCARDABLE     "External.bin"
+IDR_SCI_KEYWORDS        STUFF   DISCARDABLE     "Keywords.bin"
+
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // Accelerator
@@ -3364,6 +3470,7 @@ BEGIN
     "[",            ID_VIDEO_SEEK_SELSTART, ASCII,  NOINVERT
     VK_LEFT,        ID_VIDEO_SEEK_START,    VIRTKEY, CONTROL, NOINVERT
     VK_F10,         ID_OPTIONS_DISPLAYDECOMPRESSEDOUTPUT, VIRTKEY, SHIFT, NOINVERT
+    "E",            ID_TOOLS_AVS,           VIRTKEY, CONTROL, NOINVERT
 END
 
 IDR_CAPTURE_KEYS ACCELERATORS 
@@ -3535,6 +3642,8 @@ IDI_POS_NEXT_KEY        ICON                    "pos_next.ico"
 IDI_POS_PLAYPREVIEW     ICON                    "ico00001.ico"
 IDI_POS_SCENEFWD        ICON                    "scenefwd.ico"
 IDI_POS_SCENEREV        ICON                    "scenerev.ico"
+
+IDI_AVSEDIT             ICON    DISCARDABLE     "ico00002.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -3726,6 +3835,145 @@ BEGIN
                             "Distill an AVI file's structure down to a compact description file for remote analysis of compatibility problems."
     IDS_TOOLS_EXPANDSPARSEAVI 
                             "Expand a sparse AVI description to a full AVI with placeholder audio and video data."
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5008                    "Backspace"
+    5009                    "Tab"
+    5013                    "Enter"
+    5016                    "Shift"
+    5017                    "Ctrl"
+    5018                    "Alt"
+    5019                    "Pause"
+    5020                    "Caps Lock"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5027                    "Escape"
+    5032                    "Space"
+    5033                    "PgUp"
+    5034                    "PgDown"
+    5035                    "End"
+    5036                    "Home"
+    5037                    "Left"
+    5038                    "Up"
+    5039                    "Right"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5040                    "Down"
+    5045                    "Ins"
+    5046                    "Del"
+    5048                    "0"
+    5049                    "1"
+    5050                    "2"
+    5051                    "3"
+    5052                    "4"
+    5053                    "5"
+    5054                    "6"
+    5055                    "7"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5112                    "F1"
+    5113                    "F2"
+    5114                    "F3"
+    5115                    "F4"
+    5116                    "F5"
+    5117                    "F6"
+    5118                    "F7"
+    5119                    "F8"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5120                    "F9"
+    5121                    "F10"
+    5122                    "F11"
+    5123                    "F12"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5056                    "8"
+    5057                    "9"
+    5065                    "A"
+    5066                    "B"
+    5067                    "C"
+    5068                    "D"
+    5069                    "E"
+    5070                    "F"
+    5071                    "G"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5072                    "H"
+    5073                    "I"
+    5074                    "J"
+    5075                    "K"
+    5076                    "L"
+    5077                    "M"
+    5078                    "N"
+    5079                    "O"
+    5080                    "P"
+    5081                    "Q"
+    5082                    "R"
+    5083                    "S"
+    5084                    "T"
+    5085                    "U"
+    5086                    "V"
+    5087                    "W"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    5088                    "X"
+    5089                    "Y"
+    5090                    "Z"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_AVS_STARTCOMPLETE    "Activate Syntax Completion"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDS_SHORTCUT_NOMENU     "Shortcut"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDS_INFO_AVSEDITOR_KEY  "Ctrl-N: New File\nCtrl-O: Open File\nF2, Ctrl-S: Save File\nF5: Save File & Refresh\nF7: Save File & Loads it as movie into the main window\nCtrl-P: Inserts current position in the main window\nCtrl-R: Inserts current range in the main window (from,to)\nCtrl-T: Inserts Trim to the current range in the main window\nCtrl-Fx (x = 1-12): [Toff]s Tweaking Mod (see special help)"
+    IDS_INFO_AVSEDITOR_KEY_CAP "Keyboard commands"
+    IDS_INFO_AVSEDITOR_TOFF "In your avs code you can add #StartTweaking and #StopTweaking line to delimitate the line you want to work on, like this:\n\n mpeg2source(\\""darkcity.d2v\\"",0)\n\n #StartTweaking\n #Convolution3d (preset=\\""movieLQ\\"")\n Convolution3d (preset=\\""movieHQ\\"")\n #StopTweaking\n\n #StartTweaking\n #SimpleResize(512,384)\n BicubicResize(512,384)\n #BilinearResize(512,384)\n #LanczosResize(512,384)\n #StopTweaking\n\nThen you have to place the text cursor between the 2 marker lines and press Ctrl-F1 to uncomment the first line and comment all other lines, Ctrl-F2 to uncomment the second line and comment all other lines...\nThis way you can quickly see differences."
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDS_WARN_AVS_DISCARD_CHANGE 
+                            "Discard all changes?"
+    IDS_WARN_AVS_DISCARD_CHANGE_CAP 
+                            "Script editor warning"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDS_INFO_AVSEDITOR_TOFF_CAP 
+                            "[Toff]s Tweaking Mod"
+    IDS_INFO_AVS_VERSION_CAP "AviSynth Version"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDS_GENERAL_STRING      "%s"
+    IDS_YES                 "Yes"
+    IDS_NO                  "No"
 END
 
 #endif    // English (U.S.) resources
