@@ -18,6 +18,9 @@
 		/>
 	</Platforms>
 	<ToolFiles>
+		<ToolFile
+			RelativePath="..\YASM.rules"
+		/>
 	</ToolFiles>
 	<Configurations>
 		<Configuration
@@ -33,6 +36,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -103,6 +109,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -176,6 +185,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="YASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -243,6 +255,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -593,6 +608,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\blt_setup.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\blt_spanutils.cpp"
 				>
 				<FileConfiguration
@@ -631,6 +650,14 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\blt_uberblit.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\pixel.cpp"
+				>
 			</File>
 			<File
 				RelativePath="source\pixmaputils.cpp"
@@ -753,6 +780,18 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\resample_kernels.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\resample_stages.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\resample_stages_reference.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\stretchblt_reference.cpp"
 				>
 				<FileConfiguration
@@ -791,6 +830,10 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\tables.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\source\text.cpp"
@@ -836,6 +879,74 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\source\uberblit.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_16f.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_gen.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_resample.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_resample_special.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_swizzle.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_swizzle_x86.cpp"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_v210.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_ycbcr_x86.cpp"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -846,7 +957,19 @@
 				>
 			</File>
 			<File
+				RelativePath=".\h\blt_setup.h"
+				>
+			</File>
+			<File
 				RelativePath="h\blt_spanutils.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\blt_spanutils_x86.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\Kasumi\pixel.h"
 				>
 			</File>
 			<File
@@ -870,11 +993,99 @@
 				>
 			</File>
 			<File
+				RelativePath=".\h\resample_stages.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\resample_stages_reference.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\resample_stages_x64.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\resample_stages_x86.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\Kasumi\tables.h"
+				>
+			</File>
+			<File
 				RelativePath="..\h\vd2\Kasumi\text.h"
 				>
 			</File>
 			<File
 				RelativePath="..\h\vd2\Kasumi\triblt.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_16f.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_base.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_fill.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_gen.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_input.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_pal.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_resample.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_resample_special.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_resample_special_x86.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_rgb.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_rgb_x86.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_swizzle.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_swizzle_x86.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_v210.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_ycbcr.h"
+				>
+			</File>
+			<File
+				RelativePath=".\h\uberblit_ycbcr_x86.h"
 				>
 			</File>
 		</Filter>
@@ -886,31 +1097,11 @@
 				RelativePath="source\a_bltrgb.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -918,9 +1109,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -928,31 +1117,11 @@
 				RelativePath="source\a_bltrgb2yuv_mmx.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -960,9 +1129,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -970,31 +1137,11 @@
 				RelativePath="source\a_bltrgb_mmx.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1002,9 +1149,27 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\a_bltyuv2rgb_sse2.asm"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1012,31 +1177,11 @@
 				RelativePath="source\a_resample_mmx.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1044,9 +1189,47 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\a_resample_sse41.asm"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\a_spanutils_isse.asm"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1054,31 +1237,11 @@
 				RelativePath="source\a_stretchrgb_mmx.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1086,9 +1249,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1096,31 +1257,11 @@
 				RelativePath="source\a_stretchrgb_point.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1128,9 +1269,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1138,31 +1277,11 @@
 				RelativePath="source\a_triblt_mmx.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1170,9 +1289,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1180,31 +1297,11 @@
 				RelativePath="source\a_triblt_scalar.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1212,9 +1309,27 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\a_triblt_sse2.asm"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1222,6 +1337,26 @@
 		<Filter
 			Name="Source Files (x86)"
 			>
+			<File
+				RelativePath=".\source\blt_spanutils_x86.cpp"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
 			<File
 				RelativePath="source\blt_x86.cpp"
 				>
@@ -1236,6 +1371,7 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|x64"
+					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCLCompilerTool"
@@ -1254,11 +1390,52 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug|x64"
+					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories=""
 						PreprocessorDefinitions=""
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\resample_stages_x86.cpp"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\uberblit_resample_special_x86.cpp"
+				>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1271,23 +1448,33 @@
 				RelativePath="source\a64_resample.asm64"
 				>
 				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
 					Name="Release|x64"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug|x64"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1312,7 +1499,7 @@
 					<Tool
 						Name="VCCustomBuildTool"
 						Description=""
-						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont"
+						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont&#x0D;&#x0A;"
 						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
 						Outputs="&quot;$(InputDir)\..\h\defaultfont.inl&quot;"
 					/>
@@ -1323,7 +1510,7 @@
 					<Tool
 						Name="VCCustomBuildTool"
 						Description=""
-						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont"
+						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont&#x0D;&#x0A;"
 						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
 						Outputs="&quot;$(InputDir)\..\h\defaultfont.inl&quot;"
 					/>
@@ -1334,7 +1521,7 @@
 					<Tool
 						Name="VCCustomBuildTool"
 						Description=""
-						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont"
+						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont&#x0D;&#x0A;"
 						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
 						Outputs="&quot;$(InputDir)\..\h\defaultfont.inl&quot;"
 					/>
@@ -1345,11 +1532,47 @@
 					<Tool
 						Name="VCCustomBuildTool"
 						Description=""
-						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont"
+						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fontextract &quot;$(InputPath)&quot; Tuffy 32 127 &quot;$(InputDir)\..\h\defaultfont.inl&quot; g_VDDefaultFont&#x0D;&#x0A;"
 						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
 						Outputs="&quot;$(InputDir)\..\h\defaultfont.inl&quot;"
 					/>
 				</FileConfiguration>
+			</File>
+		</Filter>
+		<Filter
+			Name="Source Files (x64)"
+			>
+			<File
+				RelativePath=".\source\resample_stages_x64.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+		</Filter>
+		<Filter
+			Name="Interface Header Files"
+			>
+			<File
+				RelativePath="..\h\vd2\Kasumi\blitter.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\Kasumi\resample_kernels.h"
+				>
 			</File>
 		</Filter>
 		<File

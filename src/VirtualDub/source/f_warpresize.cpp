@@ -18,6 +18,9 @@
 #include "stdafx.h"
 #include <algorithm>
 #include <math.h>
+#include <vd2/system/w32assist.h>
+#include <vd2/VDXFrame/VideoFilter.h>
+#include <vd2/VDXFrame/VideoFilterDialog.h>
 
 #include "ScriptValue.h"
 #include "filter.h"
@@ -25,250 +28,8 @@
 
 #ifdef _M_IX86
 	#pragma warning(disable: 4799)		// warning C4799: function '`anonymous namespace'::CubicFilterH_MMX' has no EMMS instruction
+	#pragma warning(disable: 4505)		// warning C4505: 'VDXVideoFilter::[thunk]: __thiscall VDXVideoFilter::`vcall'{48,{flat}}' }'' : unreferenced local function has been removed
 #endif
-
-namespace {
-	///////////////////////////////////////////////////////////////////////////
-	//
-	//	class VDFilter
-	//
-	//	This class handles most of the grimy work of creating the interface
-	//	between your filter and VirtualDub.
-
-	class VDFilterBase {
-	public:
-		VDFilterBase(FilterActivation *fa, const FilterFunctions *ff);
-		virtual ~VDFilterBase();
-
-		// linkage routines
-
-		virtual bool Init();
-		virtual long GetParams()=0;
-		virtual void Start();
-		virtual bool Run() = 0;
-		virtual void End();
-		virtual bool Configure(HWND hwnd);
-		virtual void GetSettingString(char *buf, int maxlen);
-		virtual void GetScriptString(char *buf, int maxlen);
-		virtual int Serialize(char *buf, int maxbuf) = 0;
-		virtual int Deserialize(const char *buf, int maxbuf) = 0;
-
-		static void __cdecl FilterDeinit   (FilterActivation *fa, const FilterFunctions *ff);
-		static int  __cdecl FilterRun      (const FilterActivation *fa, const FilterFunctions *ff);
-		static long __cdecl FilterParam    (FilterActivation *fa, const FilterFunctions *ff);
-		static int  __cdecl FilterConfig   (FilterActivation *fa, const FilterFunctions *ff, HWND hWnd);
-		static int  __cdecl FilterStart    (FilterActivation *fa, const FilterFunctions *ff);
-		static int  __cdecl FilterEnd      (FilterActivation *fa, const FilterFunctions *ff);
-		static bool __cdecl FilterScriptStr(FilterActivation *fa, const FilterFunctions *, char *, int);
-		static void __cdecl FilterString2  (const FilterActivation *fa, const FilterFunctions *ff, char *buf, int maxlen);
-		static int  __cdecl FilterSerialize    (FilterActivation *fa, const FilterFunctions *ff, char *buf, int maxbuf);
-		static void __cdecl FilterDeserialize  (FilterActivation *fa, const FilterFunctions *ff, const char *buf, int maxbuf);
-
-		enum { sScriptMethods = 0 };
-
-	protected:
-		static INT_PTR CALLBACK StaticDlgProc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam);
-		virtual INT_PTR DlgProc(UINT msg, WPARAM wParam, LPARAM lParam);
-		bool DoConfigureDialog(HWND hwnd, LPCTSTR tmplName);
-
-		// member variables
-		FilterActivation *fa;
-		const FilterFunctions *const ff;
-
-		HWND	mhdlg;
-		IFilterPreview *mifp;
-	};
-
-	///////////////////////////////////////////////////////////////////////////
-	//
-	//	class VDFilter
-	//
-	//	This is the class you should derive your filter from -- pass your class
-	//	as the template parameter.  It is critical that this be the most
-	//	derived name for your class, as it is the one used for placement new
-	//	and placement delete!
-	//
-	template<class T>
-	class VDFilter : public VDFilterBase {
-	public:
-		VDFilter(FilterActivation *fa, const FilterFunctions *ff) : VDFilterBase(fa, ff) {}
-
-		static int  __cdecl FilterInit     (FilterActivation *fa, const FilterFunctions *ff);
-		static void __cdecl FilterCopy         (FilterActivation *fa, const FilterFunctions *ff, void *dst);
-	};
-
-	template<class T>
-	int  __cdecl VDFilter<T>::FilterInit     (FilterActivation *fa, const FilterFunctions *ff) {
-		T *pThis = new(fa->filter_data) T(fa, ff);
-
-		try {
-			if (!pThis->Init()) {
-				pThis->~T();
-				return 1;
-			}
-
-			return 0;
-		} catch(...) {
-			pThis->~T();
-			throw;
-		}
-	}
-
-	template<class T>
-	void __cdecl VDFilter<T>::FilterCopy         (FilterActivation *fa, const FilterFunctions *ff, void *dst) {
-		new(dst) T(*static_cast<T *>(reinterpret_cast<VDFilterBase *>(fa->filter_data)));
-	}
-
-	VDFilterBase::VDFilterBase(FilterActivation *fa_, const FilterFunctions *ff_)
-		: fa(fa_)
-		, ff(ff_)
-	{
-	}
-
-	VDFilterBase::~VDFilterBase() {
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-
-	bool VDFilterBase::Init() {
-		return true;
-	}
-
-	void VDFilterBase::Start() {
-	}
-
-	void VDFilterBase::End() {
-	}
-
-	bool VDFilterBase::Configure(HWND hwnd) {
-		return false;
-	}
-
-	void VDFilterBase::GetSettingString(char *buf, int maxlen) {
-	}
-
-	void VDFilterBase::GetScriptString(char *buf, int maxlen) {
-	}
-
-	int VDFilterBase::Serialize(char *buf, int maxbuf) {
-		return 0;
-	}
-
-	int VDFilterBase::Deserialize(const char *buf, int maxbuf) {
-		return 0;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-
-	INT_PTR CALLBACK VDFilterBase::StaticDlgProc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam) {
-		VDFilterBase *pThis;
-
-		if (msg == WM_INITDIALOG) {
-			SetWindowLongPtr(hdlg, DWLP_USER, (LONG_PTR)lParam);
-			pThis = (VDFilterBase *)lParam;
-			pThis->mhdlg = hdlg;
-		} else {
-			pThis = (VDFilterBase *)GetWindowLongPtr(hdlg, DWLP_USER);
-		}
-
-		if (pThis)
-			return pThis->DlgProc(msg, wParam, lParam);
-		else
-			return FALSE;
-	}
-
-	INT_PTR VDFilterBase::DlgProc(UINT msg, WPARAM wParam, LPARAM lParam) {
-		return FALSE;
-	}
-
-	bool VDFilterBase::DoConfigureDialog(HWND hwnd, LPCTSTR tmplName) {
-		MEMORY_BASIC_INFORMATION memInfo;
-		VirtualQuery("", &memInfo, sizeof memInfo);
-		return 0 != DialogBoxParam((HMODULE)memInfo.AllocationBase, tmplName, hwnd, StaticDlgProc, (LONG_PTR)this);
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-
-	void __cdecl VDFilterBase::FilterDeinit   (FilterActivation *fa, const FilterFunctions *ff) {
-		reinterpret_cast<VDFilterBase *>(fa->filter_data)->~VDFilterBase();
-	}
-
-	int  __cdecl VDFilterBase::FilterRun      (const FilterActivation *fa, const FilterFunctions *ff) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= const_cast<FilterActivation *>(fa);
-
-		return !pThis->Run();
-	}
-
-	long __cdecl VDFilterBase::FilterParam    (FilterActivation *fa, const FilterFunctions *ff) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		return pThis->GetParams();
-	}
-
-	int  __cdecl VDFilterBase::FilterConfig   (FilterActivation *fa, const FilterFunctions *ff, HWND hwnd) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		return pThis->Configure(hwnd);
-	}
-
-	int  __cdecl VDFilterBase::FilterStart    (FilterActivation *fa, const FilterFunctions *ff) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		pThis->Start();
-		return 0;
-	}
-
-	int  __cdecl VDFilterBase::FilterEnd      (FilterActivation *fa, const FilterFunctions *ff) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		pThis->End();
-		return 0;
-	}
-
-	bool __cdecl VDFilterBase::FilterScriptStr(FilterActivation *fa, const FilterFunctions *ff, char *buf, int buflen) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		pThis->GetScriptString(buf, buflen);
-
-		return true;
-	}
-
-	void __cdecl VDFilterBase::FilterString2  (const FilterActivation *fa, const FilterFunctions *ff, char *buf, int maxlen) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= const_cast<FilterActivation *>(fa);
-
-		pThis->GetSettingString(buf, maxlen);
-	}
-
-	int  __cdecl VDFilterBase::FilterSerialize    (FilterActivation *fa, const FilterFunctions *ff, char *buf, int maxbuf) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		return pThis->Serialize(buf, maxbuf);
-	}
-
-	void __cdecl VDFilterBase::FilterDeserialize  (FilterActivation *fa, const FilterFunctions *ff, const char *buf, int maxbuf) {
-		VDFilterBase *pThis = reinterpret_cast<VDFilterBase *>(fa->filter_data);
-
-		pThis->fa		= fa;
-
-		pThis->Deserialize(buf, maxbuf);
-	}
-}
 
 namespace {
 	void ScaleGradientPassForVis(uint32 *dst, const sint16 *src, uint32 count) {
@@ -294,24 +55,22 @@ namespace {
 
 int g_lengthTable[8192];
 
-class WarpResizeFilter : public VDFilter<WarpResizeFilter> {
+class WarpResizeFilter : public VDXVideoFilter, public VDXVideoFilterDialog {
 public:
-	WarpResizeFilter(FilterActivation *fa, const FilterFunctions *ff);
+	WarpResizeFilter();
 
-	long GetParams();
+	uint32 GetParams();
 	void Start();
 	void End();
-	bool Run();
-	bool Configure(HWND hwnd);
+	void Run();
+	bool Configure(VDXHWND hwnd);
 	void GetSettingString(char *buf, int maxlen);
 	void GetScriptString(char *buf, int maxlen);
-	int Serialize(char *, int);
-	int Deserialize(const char *, int);
 
-	static const ScriptFunctionDef sScriptMethods[];
+	VDXVF_DECLARE_SCRIPT_METHODS();
 
 protected:
-	static void ScriptConfigFunc(IScriptInterpreter *, void *, CScriptValue *, int);
+	void ScriptConfigFunc(IVDXScriptInterpreter *, const VDXScriptValue *, int);
 
 	INT_PTR DlgProc(UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -338,54 +97,29 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////
 
-namespace {
-	const CScriptObject g_scriptObject_warpresize={
-		NULL, (ScriptFunctionDef *)WarpResizeFilter::sScriptMethods, NULL
-	};
-};
-
-extern FilterDefinition filterDef_warpresize = {
-	NULL, NULL, NULL,
+extern const FilterDefinition filterDef_warpresize = VDXVideoFilterDefinition<WarpResizeFilter>(
+	NULL,
 	"warp resize",
-	"Stretches an image with edge-directed sharpening using a variant of the warpsharp algorithm.",
-	"Avery Lee",
-	NULL,
-	sizeof(WarpResizeFilter),
+	"Stretches an image with edge-directed sharpening using a variant of the warpsharp algorithm."
+	);
 
-	WarpResizeFilter::FilterInit,
-	WarpResizeFilter::FilterDeinit,
-	WarpResizeFilter::FilterRun,
-	WarpResizeFilter::FilterParam,
-	WarpResizeFilter::FilterConfig,
-	NULL,
-	WarpResizeFilter::FilterStart,
-	WarpResizeFilter::FilterEnd,
-
-	(CScriptObject *)&g_scriptObject_warpresize,
-	WarpResizeFilter::FilterScriptStr,
-
-	WarpResizeFilter::FilterString2,
-	WarpResizeFilter::FilterSerialize,
-	WarpResizeFilter::FilterDeserialize,
-	WarpResizeFilter::FilterCopy,
-};
-
-WarpResizeFilter::WarpResizeFilter(FilterActivation *fa, const FilterFunctions *ff)
-	: VDFilter<WarpResizeFilter>(fa, ff)
-	, mbUseMMX(false)
+WarpResizeFilter::WarpResizeFilter()
+	: mbUseMMX(false)
 	, mbShowGradientMap(false)
 	, mTargetWidth(640)
 	, mTargetHeight(480)
 {
 }
 
-long WarpResizeFilter::GetParams() {
+uint32 WarpResizeFilter::GetParams() {
 	fa->dst.w = mTargetWidth;
 	if (fa->dst.w < fa->src.w)
 		fa->dst.w = fa->src.w;
+
 	fa->dst.h = mTargetHeight;
 	if (fa->dst.h < fa->src.h)
 		fa->dst.h = fa->src.h;
+
 	fa->dst.offset = 0;
 	fa->dst.pitch = fa->dst.w * 4;
 	fa->dst.modulo = 0;
@@ -449,7 +183,7 @@ void WarpResizeFilter::End() {
 	mpTempRows = NULL;
 }
 
-bool WarpResizeFilter::Run() {
+void WarpResizeFilter::Run() {
 	ComputeGradientMap();
 
 	if (mbShowGradientMap) {
@@ -467,22 +201,21 @@ bool WarpResizeFilter::Run() {
 		ComputeBicubicImage();
 		ComputeFinalPass();
 	}
-	return true;
 }
 
-bool WarpResizeFilter::Configure(HWND hwnd) {
+bool WarpResizeFilter::Configure(VDXHWND hwnd) {
 	bool saveGrad = mbShowGradientMap;
 	int saveW = mTargetWidth;
 	int saveH = mTargetHeight;
 
-	bool success = DoConfigureDialog(hwnd, MAKEINTRESOURCE(IDD_FILTER_WARPRESIZE));
+	bool success = 0 != Show(VDGetLocalModuleHandleW32(), MAKEINTRESOURCE(IDD_FILTER_WARPRESIZE), (HWND)hwnd);
 	if (!success) {
 		mbShowGradientMap = saveGrad;
 		mTargetWidth = saveW;
 		mTargetHeight = saveH;
 	}
 
-	return !success;
+	return success;
 }
 
 INT_PTR WarpResizeFilter::DlgProc(UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -532,14 +265,6 @@ void WarpResizeFilter::GetSettingString(char *buf, int maxlen) {
 void WarpResizeFilter::GetScriptString(char *buf, int maxlen) {
 	_snprintf(buf, maxlen, "Config(%u, %u, %d)", mTargetWidth, mTargetHeight, mbShowGradientMap);
 	buf[maxlen - 1] = 0;
-}
-
-int WarpResizeFilter::Serialize(char *, int) {
-	return 0;
-}
-
-int WarpResizeFilter::Deserialize(const char *, int) {
-	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1746,20 +1471,19 @@ void WarpResizeFilter::ComputeFinalPass() {
 #endif
 }
 
-void WarpResizeFilter::ScriptConfigFunc(IScriptInterpreter *, void *obj, CScriptValue *argv, int argc) {
-	FilterActivation *fa = (FilterActivation *)obj;
-	WarpResizeFilter *pThis = (WarpResizeFilter *)fa->filter_data;
-
-	pThis->mTargetWidth = argv[0].asInt();
-	if (pThis->mTargetWidth < 1)
-		pThis->mTargetWidth = 1;
-	pThis->mTargetHeight = argv[1].asInt();
-	if (pThis->mTargetHeight < 1)
-		pThis->mTargetHeight = 1;
-	pThis->mbShowGradientMap = argv[2].asInt() != 0;
+void WarpResizeFilter::ScriptConfigFunc(IVDXScriptInterpreter *, const VDXScriptValue *argv, int argc) {
+	mTargetWidth = argv[0].asInt();
+	if (mTargetWidth < 1)
+		mTargetWidth = 1;
+	mTargetHeight = argv[1].asInt();
+	if (mTargetHeight < 1)
+		mTargetHeight = 1;
+	mbShowGradientMap = argv[2].asInt() != 0;
 }
 
-const ScriptFunctionDef WarpResizeFilter::sScriptMethods[]={
-	{ (ScriptFunctionPtr)ScriptConfigFunc, "Config", "0iii" },
-	{ NULL, NULL },
-};
+VDXVF_BEGIN_SCRIPT_METHODS(WarpResizeFilter)
+	VDXVF_DEFINE_SCRIPT_METHOD(WarpResizeFilter, ScriptConfigFunc, "iii")
+VDXVF_END_SCRIPT_METHODS()
+
+// warning C4505: 'VDXVideoFilter::[thunk]: __thiscall VDXVideoFilter::`vcall'{24,{flat}}' }'' : unreferenced local function has been removed
+#pragma warning(disable: 4505)

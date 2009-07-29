@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <functional>
 
 #include <vd2/system/vdtypes.h>
 #include <vd2/system/text.h>
@@ -110,6 +111,37 @@ public:
 		return p ? (const value_type *)p - mpBegin : npos;
 	}
 
+	int compare(const VDStringSpanA& s) const {
+		size_type l1 = mpEnd - mpBegin;
+		size_type l2 = s.mpEnd - s.mpBegin;
+		size_type lm = l1 < l2 ? l1 : l2;
+
+		int r = memcmp(mpBegin, s.mpBegin, lm);
+
+		if (!r)
+			r = (int)mpBegin[lm] - (int)s.mpBegin[lm];
+
+		return r;
+	}
+
+	const VDStringSpanA trim(const value_type *s) const {
+		bool flags[256]={false};
+
+		while(value_type c = *s++)
+			flags[(unsigned char)c] = true;
+
+		const value_type *p = mpBegin;
+		const value_type *q = mpEnd;
+
+		while(p != q && flags[*p])
+			++p;
+
+		while(p != q && flags[q[-1]])
+			--q;
+
+		return VDStringSpanA(p, q);
+	}
+
 	const VDStringSpanA subspan(size_type pos = 0, size_type n = npos) const {
 		
 		size_type len = (size_type)(mpEnd - mpBegin);
@@ -141,6 +173,78 @@ inline bool operator!=(const VDStringSpanA& x, const VDStringSpanA& y) { return 
 inline bool operator!=(const VDStringSpanA& x, const char *y) { return !(x == y); }
 inline bool operator!=(const char *x, const VDStringSpanA& y) { return !(y == x); }
 
+inline bool operator<(const VDStringSpanA& x, const VDStringSpanA& y) {
+	return x.compare(y) < 0;
+}
+
+inline bool operator>(const VDStringSpanA& x, const VDStringSpanA& y) {
+	return x.compare(y) > 0;
+}
+
+inline bool operator<=(const VDStringSpanA& x, const VDStringSpanA& y) {
+	return x.compare(y) <= 0;
+}
+
+inline bool operator>=(const VDStringSpanA& x, const VDStringSpanA& y) {
+	return x.compare(y) >= 0;
+}
+
+class VDStringRefA : public VDStringSpanA {
+public:
+	typedef VDStringRefA this_type;
+
+	VDStringRefA()  {
+	}
+
+	explicit VDStringRefA(const value_type *s)
+		: VDStringSpanA(s)
+	{
+	}
+
+	explicit VDStringRefA(const VDStringSpanA& s)
+		: VDStringSpanA(s)
+	{
+	}
+
+	VDStringRefA(const value_type *s, const value_type *t)
+		: VDStringSpanA(s, t)
+	{
+	}
+
+	this_type& operator=(const value_type *s) {
+		assign(s);
+		return *this;
+	}
+
+	this_type& operator=(const VDStringSpanA& str) {
+		assign(str);
+		return *this;
+	}
+
+	void assign(const value_type *s) {
+		static_cast<VDStringSpanA&>(*this) = VDStringSpanA(s);
+	}
+
+	void assign(const value_type *s, const value_type *t) {
+		static_cast<VDStringSpanA&>(*this) = VDStringSpanA(s, t);
+	}
+
+	void assign(const VDStringSpanA& s) {
+		static_cast<VDStringSpanA&>(*this) = s;
+	}
+
+	bool split(value_type c, VDStringRefA& token) {
+		size_type pos = find(c);
+
+		if (pos == npos)
+			return false;
+
+		token = subspan(0, pos);
+		mpBegin += pos+1;
+		return true;
+	}
+};
+
 class VDStringA : public VDStringSpanA {
 public:
 	typedef VDStringA				this_type;
@@ -150,6 +254,12 @@ public:
 	VDStringA()
 		: mpEOS(const_cast<value_type *>(sNull))
 	{
+	}
+
+	VDStringA(const VDStringSpanA& x)
+		: mpEOS(const_cast<value_type *>(sNull))
+	{
+		assign(x.begin(), x.end());
 	}
 
 	VDStringA(const this_type& x)
@@ -176,6 +286,12 @@ public:
 		assign(s, n);
 	}
 
+	VDStringA(const value_type *s, const value_type *t)
+		: mpEOS(const_cast<value_type *>(sNull))
+	{
+		assign(s, t);
+	}
+
 	~VDStringA() {
 		if (mpBegin != sNull)
 			delete[] mpBegin;
@@ -187,6 +303,11 @@ public:
 	}
 
 	this_type& operator=(const this_type& str) {
+		assign(str);
+		return *this;
+	}
+
+	this_type& operator=(const VDStringSpanA& str) {
 		assign(str);
 		return *this;
 	}
@@ -309,6 +430,10 @@ public:
 
 		*mpEnd++ = c;
 		*mpEnd = 0;
+	}
+
+	this_type& assign(const VDStringSpanA& str) {
+		return assign(str.begin(), str.end());
 	}
 
 	this_type& assign(const this_type& str) {
@@ -482,6 +607,15 @@ inline VDStringA operator+(const VDStringA& str, char c) {
 	return result;
 }
 
+namespace std {
+	template<>
+	struct less<VDStringA> : binary_function<VDStringA, VDStringA, bool> {
+		bool operator()(const VDStringA& x, const VDStringA& y) const {
+			return x.compare(y) < 0;
+		}
+	};
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 class VDStringSpanW {
@@ -585,6 +719,62 @@ inline bool operator!=(const VDStringSpanW& x, const VDStringSpanW& y) { return 
 inline bool operator!=(const VDStringSpanW& x, const wchar_t *y) { return !(x == y); }
 inline bool operator!=(const wchar_t *x, const VDStringSpanW& y) { return !(y == x); }
 
+class VDStringRefW : public VDStringSpanW {
+public:
+	typedef VDStringRefW this_type;
+
+	VDStringRefW()  {
+	}
+
+	explicit VDStringRefW(const value_type *s)
+		: VDStringSpanW(s)
+	{
+	}
+
+	explicit VDStringRefW(const VDStringSpanW& s)
+		: VDStringSpanW(s)
+	{
+	}
+
+	VDStringRefW(const value_type *s, const value_type *t)
+		: VDStringSpanW(s, t)
+	{
+	}
+
+	this_type& operator=(const value_type *s) {
+		assign(s);
+		return *this;
+	}
+
+	this_type& operator=(const VDStringSpanW& str) {
+		assign(str);
+		return *this;
+	}
+
+	void assign(const value_type *s) {
+		static_cast<VDStringSpanW&>(*this) = VDStringSpanW(s);
+	}
+
+	void assign(const value_type *s, const value_type *t) {
+		static_cast<VDStringSpanW&>(*this) = VDStringSpanW(s, t);
+	}
+
+	void assign(const VDStringSpanW& s) {
+		static_cast<VDStringSpanW&>(*this) = s;
+	}
+
+	bool split(value_type c, VDStringRefW& token) {
+		size_type pos = find(c);
+
+		if (pos == npos)
+			return false;
+
+		token = subspan(0, pos);
+		mpBegin += pos+1;
+		return true;
+	}
+};
+
 class VDStringW : public VDStringSpanW {
 public:
 	typedef VDStringW				this_type;
@@ -594,6 +784,12 @@ public:
 	VDStringW()
 		: mpEOS(const_cast<value_type *>(sNull))
 	{
+	}
+
+	VDStringW(const VDStringSpanW& x)
+		: mpEOS(const_cast<value_type *>(sNull))
+	{
+		assign(x.begin(), x.end());
 	}
 
 	VDStringW(const this_type& x)

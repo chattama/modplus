@@ -24,12 +24,15 @@
 #include <vd2/system/vectors.h>
 #include <vd2/system/refcount.h>
 #include <vd2/Riza/capdriver.h>
+#include <vd2/Riza/avi.h>
+#include <vd2/Riza/audiocodec.h>
 #include <windows.h>
 #include <mmsystem.h>
 #include "capfilter.h"
 #include <vector>
 
 struct VDPixmap;
+class VDFraction;
 
 #define	CAPSTOP_TIME			(0x00000001L)
 #define	CAPSTOP_FILESIZE		(0x00000002L)
@@ -49,7 +52,9 @@ struct VDCaptureFilterSetup {
 	IVDCaptureFilterSystem::FilterMode mVertSquashMode;
 	int			mNRThreshold;		// default 16
 
-	bool		mbEnableRGBFiltering;
+	bool		mbEnableFilterChain;
+	bool		mbSkipFilterChainConversion;
+
 	bool		mbEnableNoiseReduction;
 	bool		mbEnableLumaSquishBlack;
 	bool		mbEnableLumaSquishWhite;
@@ -86,6 +91,7 @@ struct VDCaptureTimingSetup {
 	bool		mbUseAudioTimestamps;
 	bool		mbDisableClockForPreview;
 	bool		mbForceAudioRendererClock;
+	bool		mbIgnoreVideoTimestamps;
 };
 
 struct VDCaptureStatus {
@@ -241,12 +247,13 @@ public:
 
 	virtual void	SetFrameTime(sint32 lFrameTime) = 0;
 	virtual sint32	GetFrameTime() = 0;
+	virtual VDFraction GetFrameRate() = 0;
 
 	virtual void	SetTimingSetup(const VDCaptureTimingSetup& syncSetup) = 0;
 	virtual const VDCaptureTimingSetup&	GetTimingSetup() = 0;
 
-	virtual void	SetLoggingEnabled(bool ena) = 0;
-	virtual bool	IsLoggingEnabled() = 0;
+	virtual void	SetLogEnabled(bool ena) = 0;
+	virtual bool	IsLogEnabled() = 0;
 	virtual bool	IsLogAvailable() = 0;
 	virtual void	SaveLog(const wchar_t *path) = 0;
 
@@ -315,17 +322,17 @@ public:
  
 	virtual uint32	GetPreviewFrameCount() = 0;
 
-	virtual bool	SetVideoFormat(const BITMAPINFOHEADER& bih, LONG cbih) = 0;
-	virtual bool	GetVideoFormat(vdstructex<BITMAPINFOHEADER>& bih) = 0;
+	virtual bool	SetVideoFormat(const VDAVIBitmapInfoHeader& bih, LONG cbih) = 0;
+	virtual bool	GetVideoFormat(vdstructex<VDAVIBitmapInfoHeader>& bih) = 0;
 
-	virtual void	GetAvailableAudioFormats(std::list<vdstructex<WAVEFORMATEX> >& aformats) = 0;
+	virtual void	GetAvailableAudioFormats(std::list<vdstructex<VDWaveFormat> >& aformats) = 0;
 
-	virtual bool	SetAudioFormat(const WAVEFORMATEX& wfex, LONG cbwfex) = 0;
-	virtual bool	GetAudioFormat(vdstructex<WAVEFORMATEX>& wfex) = 0;
+	virtual bool	SetAudioFormat(const VDWaveFormat& wfex, LONG cbwfex) = 0;
+	virtual bool	GetAudioFormat(vdstructex<VDWaveFormat>& wfex) = 0;
 
 	virtual void	SetAudioCompFormat() = 0;
-	virtual void	SetAudioCompFormat(const WAVEFORMATEX& wfex, uint32 cbwfex, const char *shortNameHint) = 0;
-	virtual bool	GetAudioCompFormat(vdstructex<WAVEFORMATEX>& wfex, VDStringA& shortNameHint) = 0;
+	virtual void	SetAudioCompFormat(const VDWaveFormat& wfex, uint32 cbwfex, const char *shortNameHint) = 0;
+	virtual bool	GetAudioCompFormat(vdstructex<VDWaveFormat>& wfex, VDStringA& shortNameHint) = 0;
 
 	virtual bool	IsPropertySupported(uint32 id) = 0;
 	virtual sint32	GetPropertyInt(uint32 id, bool *pAutomatic) = 0;
@@ -334,6 +341,7 @@ public:
 
 	virtual void		SetCaptureFile(const wchar_t *filename, bool isStripeSystem) = 0;
 	virtual VDStringW	GetCaptureFile() = 0;
+	virtual void		PreallocateCaptureFile(sint64 size) = 0;
 	virtual bool		IsStripingEnabled() = 0;
 
 	virtual void	SetSpillSystem(bool enable) = 0;

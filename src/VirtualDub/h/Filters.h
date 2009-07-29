@@ -18,6 +18,10 @@
 #ifndef f_FILTERS_H
 #define f_FILTERS_H
 
+#ifdef _MSC_VER
+	#pragma once
+#endif
+
 #include <malloc.h>
 
 #include <windows.h>
@@ -28,6 +32,9 @@
 #include <vd2/system/error.h>
 #include <vd2/system/VDString.h>
 #include <vd2/system/refcount.h>
+#include <vd2/Kasumi/pixmap.h>
+#include <vd2/VDLib/win32/DIBSection.h>
+#include <vd2/VDLib/win32/FileMapping.h>
 #include <vd2/VDLib/ParameterCurve.h>
 #include "VBitmap.h"
 #include "FilterSystem.h"
@@ -38,144 +45,44 @@
 
 //////////////////
 
-struct CScriptObject;
 class IVDVideoDisplay;
 class IVDPositionControl;
 struct VDWaveFormat;
 class VDTimeline;
+struct VDXWaveFormat;
+struct VDXFilterDefinition;
+class VDExternalModule;
 
 ///////////////////
 
-VDWaveFormat *VDCopyWaveFormat(const VDWaveFormat *pFormat);
+VDXWaveFormat *VDXCopyWaveFormat(const VDXWaveFormat *pFormat);
 
 ///////////////////
 
-class FilterDefinitionInstance;
-
-class VFBitmapInternal : public VBitmap {
+class FilterDefinitionInstance : public ListNode2<FilterDefinitionInstance> {
 public:
-	// Must match layout of VFBitmap!
-	enum {
-		NEEDS_HDC		= 0x00000001L,
-	};
+	FilterDefinitionInstance(VDExternalModule *pfm);
+	~FilterDefinitionInstance();
 
-	DWORD	dwFlags;
-	HDC		hdc;
-};
+	void Assign(const FilterDefinition& def, int len);
 
-class FilterInstanceAutoDeinit;
+	const FilterDefinition& Attach();
+	void Detach();
 
-class FilterInstance : public ListNode, public FilterActivation {
-private:
-	FilterInstance& operator=(const FilterInstance&);		// outlaw copy assignment
-public:
-	VFBitmapInternal realSrc, realDst, realLast;
-	int mBlendBuffer;
-	LONG flags;
-	HBITMAP hbmDst, hbmLast;
-	HGDIOBJ hgoDst, hgoLast;
-	void *pvDstView, *pvLastView;
-	int srcbuf, dstbuf;
-	int origw, origh;
+	const FilterDefinition& GetDef() const { return mDef; }
+	VDExternalModule	*GetModule() const { return mpExtModule; }
 
-	FilterStateInfo *pfsiDelayRing;
-	FilterStateInfo *pfsiDelayInput;
-	FilterStateInfo fsiDelay;
-	FilterStateInfo fsiDelayOutput;
-	int nDelayRingPos;
-	int nDelayRingSize;
-
-	VDStringW	mFilterName;
-
-	FilterInstanceAutoDeinit	*mpAutoDeinit;
-
-	std::vector<VDScriptFunctionDef>	mScriptFunc;
-	VDScriptObject	mScriptObj;
-
-	///////
-
-	FilterInstance(const FilterInstance& fi);
-	FilterInstance(FilterDefinitionInstance *);
-	~FilterInstance();
-
-	FilterInstance *Clone();
-	void Destroy();
-
-	VDParameterCurve *GetAlphaParameterCurve() const { return mpAlphaCurve; }
-	void SetAlphaParameterCurve(VDParameterCurve *p) { mpAlphaCurve = p; }
+	const VDStringA&	GetName() const { return mName; }
+	const VDStringA&	GetAuthor() const { return mAuthor; }
+	const VDStringA&	GetDescription() const { return mDescription; }
 
 protected:
-	static void ConvertParameters(CScriptValue *dst, const VDScriptValue *src, int argc);
-	static void ConvertValue(VDScriptValue& dst, const CScriptValue& src);
-	static void ScriptFunctionThunkVoid(IVDScriptInterpreter *, VDScriptValue *, int);
-	static void ScriptFunctionThunkInt(IVDScriptInterpreter *, VDScriptValue *, int);
-	static void ScriptFunctionThunkVariadic(IVDScriptInterpreter *, VDScriptValue *, int);
-
-	FilterDefinitionInstance *mpFDInst;
-
-	vdrefptr<VDParameterCurve> mpAlphaCurve;
-};
-
-class FilterPreview : public IVDFilterPreview2 {
-private:
-	HWND hdlg, hwndButton;
-	wchar_t	mButtonAccelerator;
-
-	HWND hwndParent;
-	HWND	mhwndPosition;
-	IVDPositionControl	*mpPosition;
-	HWND	mhwndDisplay;
-	IVDVideoDisplay *mpDisplay;
-	HWND	mhwndToolTip;
-	FilterSystem filtsys;
-	BITMAPINFOHEADER bih;
-	FilterStateInfo fsi;
-	List *pFilterList;
-	FilterInstance *pfiThisFilter;
-	VDTimeline *mpTimeline;
-
-	FilterPreviewButtonCallback		pButtonCallback;
-	void							*pvButtonCBData;
-	FilterPreviewSampleCallback		pSampleCallback;
-	void							*pvSampleCBData;
-
-	MyError		mFailureReason;
-
-	ModelessDlgNode		mDlgNode;
-
-	static INT_PTR CALLBACK StaticDlgProc(HWND hdlg, UINT message, WPARAM wParam, LPARAM lParam);
-	BOOL DlgProc(UINT message, WPARAM wParam, LPARAM lParam);
-
-	void OnInit();
-	void OnResize();
-	void OnPaint();
-	void OnVideoResize(bool bInitial);
-	void OnVideoRedraw();
-	bool OnCommand(UINT);
-
-	VDPosition FetchFrame();
-	VDPosition FetchFrame(VDPosition);
-
-	void UpdateButton();
-
-public:
-	FilterPreview(List *, FilterInstance *);
-	~FilterPreview();
-
-	void SetButtonCallback(FilterPreviewButtonCallback, void *);
-	void SetSampleCallback(FilterPreviewSampleCallback, void *);
-
-	bool isPreviewEnabled();
-	bool IsPreviewDisplayed();
-	void InitButton(HWND);
-	void Toggle(HWND);
-	void Display(HWND, bool);
-	void RedoFrame();
-	void UndoSystem();
-	void RedoSystem();
-	void Close();
-	bool SampleCurrentFrame();
-	long SampleFrames();
+	VDExternalModule	*mpExtModule;
+	FilterDefinition	mDef;
+	VDAtomicInt			mRefCount;
+	VDStringA			mName;
+	VDStringA			mAuthor;
+	VDStringA			mDescription;
 };
 
 //////////
@@ -184,9 +91,9 @@ extern List			g_listFA;
 
 extern FilterSystem	filters;
 
-FilterDefinition *	FilterAdd(FilterModule *fm, FilterDefinition *pfd, int fd_len);
-void				FilterAddBuiltin(const FilterDefinition *pfd);
-void				FilterRemove(FilterDefinition *fd);
+VDXFilterDefinition *FilterAdd(VDXFilterModule *fm, VDXFilterDefinition *pfd, int fd_len);
+void				FilterAddBuiltin(const VDXFilterDefinition *pfd);
+void				FilterRemove(VDXFilterDefinition *fd);
 
 struct FilterBlurb {
 	FilterDefinitionInstance	*key;
@@ -198,6 +105,6 @@ struct FilterBlurb {
 void				FilterEnumerateFilters(std::list<FilterBlurb>& blurbs);
 
 
-LONG FilterGetSingleValue(HWND hWnd, LONG cVal, LONG lMin, LONG lMax, char *title, IFilterPreview *ifp, void (*pUpdateFunction)(long value, void *data), void *pUpdateFunctionData);
+bool VDFilterGetSingleValue(HWND hWnd, sint32 cVal, sint32 *result, sint32 lMin, sint32 lMax, char *title, IVDXFilterPreview2 *ifp2, void (*pUpdateFunction)(long value, void *data), void *pUpdateFunctionData);
 
 #endif

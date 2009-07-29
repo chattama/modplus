@@ -1,8 +1,6 @@
 #ifndef f_DUBUTILS_H
 #define f_DUBUTILS_H
 
-#include <windows.h>
-#include <vfw.h>
 #include <vector>
 
 #include <vd2/system/vdtypes.h>
@@ -15,8 +13,6 @@ class IVDStreamSource;
 class IVDVideoSource;
 class FrameSubset;
 class FilterSystem;
-
-int VDGetSizeOfBitmapHeaderW32(const BITMAPINFOHEADER *pHdr);
 
 
 ///////////////////////////////////////////////////////////////////////////
@@ -108,82 +104,26 @@ class VDRenderFrameMap {
 public:
 	struct FrameEntry {
 		VDPosition	mTimelineFrame;
-		VDPosition	mDisplayFrame;
-		VDPosition	mOrigDisplayFrame;
-		int			mSrcIndex;
+		VDPosition	mSourceFrame;		///< If -1, a drop frame should be written.
+		bool		mbDirect;			///< Set if this frame should be copied directly.
+		bool		mbHoldFrame;		///< Set if this frame is not followed by a processed frame.
 	};
 
-	void		Init(const vdfastvector<IVDVideoSource *>& videoSources, VDPosition nSrcStart, VDFraction srcStep, const FrameSubset *pSubset, VDPosition nFrameCount, bool bDirect);
+	void Init(const vdfastvector<IVDVideoSource *>& videoSources, VDPosition nSrcStart, VDFraction srcStep, const FrameSubset *pSubset, VDPosition nFrameCount, bool allowDirect, bool forceDirect, bool preserveEmptyFrames, const FilterSystem *pRemapperFS);
 
 	VDPosition	size() const { return mFrameMap.size(); }
 
-	const FrameEntry& operator[](VDPosition outFrame) const {
-		return outFrame>=0 && outFrame<mMaxFrame ? mFrameMap[(tFrameMap::size_type)outFrame] : mInvalidEntry;
-	}
+	const FrameEntry operator[](VDPosition outFrame) const;
 
 protected:
-	typedef vdfastvector<FrameEntry> tFrameMap;
-	tFrameMap mFrameMap;
+	struct InternalFrameEntry {
+		VDPosition	mTimelineFrame;
+		VDPosition	mSourceFrameAndDirectFlag;
+	};
+
+	typedef vdfastvector<InternalFrameEntry> FrameMap;
+	FrameMap mFrameMap;
 	VDPosition mMaxFrame;
-	FrameEntry	mInvalidEntry;
-};
-
-///////////////////////////////////////////////////////////////////////////
-//
-//	VDRenderFrameIterator
-//
-//	Render frame iterators sequentially walk down a frame render map,
-//	returning a list of display frames to be processed, and the stream
-//	frames that must be fetched to decode them.
-//
-///////////////////////////////////////////////////////////////////////////
-
-struct VDRenderFrameStep {
-	VDPosition	mSourceFrame;
-	VDPosition	mTargetSample;
-	VDPosition	mOrigDisplayFrame;
-	VDPosition	mDisplayFrame;
-	VDPosition	mTimelineFrame;
-	bool		mbIsPreroll;
-	bool		mbDirect;
-	bool		mbSameAsLast;
-	int			mSrcIndex;
-};
-
-class VDRenderFrameIterator {
-public:
-	VDRenderFrameIterator(const VDRenderFrameMap& frameMap) : mFrameMap(frameMap) {}
-
-	void		Init(const vdfastvector<IVDVideoSource *>& videoSources, bool bDirect, bool bSmart, const FilterSystem *filtsys);
-	VDRenderFrameStep	Next();
-
-protected:
-	bool		Reload();
-	void		ReloadQueue(sint32 nCount);
-	long		ConvertToIdealRawFrame(sint64 frame);
-
-	const VDRenderFrameMap&	mFrameMap;
-
-	int			mSrcIndex;
-	int			mLastSrcIndex;
-	VDPosition	mSrcTimelineFrame;
-	VDPosition	mSrcOrigDisplayFrame;
-	VDPosition	mSrcDisplayFrame;
-	VDPosition	mSrcTargetSample;
-	VDPosition	mLastSrcDisplayFrame;
-	VDPosition	mDstFrame;
-	VDPosition	mDstFrameQueueNext;
-
-	vdfastvector<IVDVideoSource *> mVideoSources;
-	IVDVideoSource *mpVideoSource;
-
-	const FilterSystem	*mpFilterSystem;
-
-	bool		mbDirect;
-	bool		mbSmart;
-	bool		mbSameAsLast;
-	bool		mbFirstSourceFrame;
-	bool		mbFinished;
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -197,8 +137,12 @@ public:
 	VDAudioPipeline();
 	~VDAudioPipeline();
 
-	void Init(uint32 bytes, uint32 sampleSize);
+	void Init(uint32 bytes, uint32 sampleSize, bool vbrModeEnabled);
 	void Shutdown();
+
+	bool IsVBRModeEnabled() {
+		return mbVBRModeEnabled;
+	}
 
 	void Abort() {
 		msigRead.signal();
@@ -228,6 +172,10 @@ public:
 		return mBuffer.full();
 	}
 
+	int size() const {
+		return mBuffer.size();
+	}
+
 	int getLevel() const {
 		return mBuffer.getLevel();
 	}
@@ -247,11 +195,12 @@ public:
 	VDSignal& getReadSignal() { return msigRead; }
 	VDSignal& getWriteSignal() { return msigWrite; }
 
-	int Read(void *pBuffer, int bytes);
+	int ReadPartial(void *pBuffer, int bytes);
 	void ReadWait() {
 		msigWrite.wait();
 	}
 
+	bool Write(const void *data, int bytes, const VDAtomicInt *abortFlag);
 	void *BeginWrite(int requested, int& actual);
 	void EndWrite(int actual);
 
@@ -260,6 +209,7 @@ protected:
 	VDRingBuffer<char>	mBuffer;
 	VDSignal			msigRead;
 	VDSignal			msigWrite;
+	bool				mbVBRModeEnabled;
 	volatile bool		mbInputClosed;
 	volatile bool		mbOutputClosed;
 };
@@ -275,6 +225,10 @@ public:
 	VDLoopThrottle();
 	~VDLoopThrottle();
 
+	float GetActivityRatio() const {
+		return mActivityRatio;
+	}
+
 	void SetThrottleFactor(float factor) {
 		mThrottleFactor = factor;
 	}
@@ -286,6 +240,7 @@ public:
 
 protected:
 	VDAtomicFloat	mThrottleFactor;
+	VDAtomicFloat	mActivityRatio;
 	int		mWaitDepth;
 	float	mWaitTime;
 	uint32	mLastTime;

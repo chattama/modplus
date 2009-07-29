@@ -1,6 +1,352 @@
 VirtualDub change log
 
-Build %build% (1.7.8, stable): [%date%]
+Build %build% (1.9.4, stable): [%date%]
+   [bugs fixed]
+   * Fixed chroma subsampling and 4:1:0 chroma positioning in test videos.
+   * Scene stepping works with panes disabled.
+   * Fixed crash in scene stepping with certain frame sizes and 24-bit RGB selected as the input format.
+   * Path options were reversed in the batch wizard.
+   * Filters: Fixed crash when VDXA is enabled and 3D acceleration initialization fails.
+   * Filters: Corrected several positioning errors in resize filter in 3D accelerated mode.
+   * Filters: Fixed bad offset and channel swapping when cropping on a filter that triggers a switch to 3D accelerated operation in RGB mode.
+   * Filters: Fixed cut off size text in cropping dialog.
+   * Filters: Field bob, threshold, and sharpen filters were added to the list even if the configuration dialog was cancelled.
+   * Capture: Devices that don't declare a frame rate now cause an error rather than a crash.
+   
+   [regressions fixed]
+   * Fixed compatibility problems with Windows NT 4.0.
+
+Build 32507 (1.9.3, experimental): [July 5, 2009]
+   [features added]
+   * UI: Added options to display only one of the panes and to autosize them.
+   * Filters: Added support for 3D hardware acceleration.
+   * Filters: Invert, warp sharp, blur, blur more, brightness/contrast, deinterlace, and resize support hardware acceleration.
+   
+   [bugs fixed]
+   * Drag and drop onto the batch wizard now works in Windows Vista and Windows 7.
+   * Go To Prev/Next Drop command now works after the timeline has been edited.
+   * Fixed random frame codes on the one-after frame.
+   * AVI: fccHandler header value for newly generated uncompressed videos with non-RGB formats is now set to the FOURCC to work around encoders that don't accept DIB.
+   * AVI: Fixed bug where zero-byte pad frames were lost if the video stream had a non-zero dwSampleSize value set.
+   * Filters: Cropping button is now grayed out for disabled filters, since the input size is unknown.
+   * Filters: Fill filter now shows correct input size when there are earlier filters (although, currently, the image is still incorrect).
+   * Filters: Fixed bug where crop bounds weren't recorded correctly if the up/down buttons were clicked and a thousands separator appeared.
+   * Filters: Fixed random crash in interlace filter when switching formats.
+   * Filters: The manual field order options in the IVTC filter were flipped.
+   * Filters: Resize no longer forces a conversion to YV24 when resizing YV16 input in interlaced mode.
+   * Display: Fixed crash in GDI minidriver when displaying interlaced video with a 0x0 pane.
+   * DV: Fall back to subsequent frames if the first frame has invalid audio metadata.
+   * Capture: Fixed preview window being the wrong size when filtering/cropping is enabled and preview acceleration is off.
+   * Capture: Fixed inconsistency in capture timing defaults. This only matters if you haven't already run VirtualDub in capture mode once.
+   * Capture: The AVI superindex/subindex settings now also apply to captures.
+   
+   [regressions fixed]
+   * Filters: Fixed error in IVTC computations for RGB32, YUY2, and UYVY formats (since 1.9.1).
+
+Build 31953 (1.9.2, experimental): [May 7, 2009]
+   [features added]
+   * UI: Added support for configuring keyboard shortcuts in edit mode.
+   * UI: Added Always on Top to window menu.
+   * Filters: Filter cropping dialog is now resizable.
+   * Filters: Added align-to-2 option in resize filter.
+   * Filters: ELA and Yadif modes of deinterlace filter are now optimized for CPUs that have MMX but lack SSE2.
+   * Filters: The filter preview window now has the same context menu size and filter options as the main panes.
+   * Filters: Frame conversions at the start of a video filter are now cached.
+   * Filters: Fixed rare crash when downsizing 8-bit YCbCr images with resize filter.
+   * Filters: Improved frame allocator assignment for lower memory usage.
+   * Filters: Added field delay filter.
+   * Render: Added an option to warn if no audio is written on a save operation.
+   * Render: Fixed several blitter bugs, particularly those involving 4:1:1 sampling.
+
+   [bugs fixed]
+   * Preferences: Audio buffers value was set incorrectly exiting the dialog. The value show when the dialog appears was correct.
+   * Filters: Fixed positioning issues in the filter cropping dialog for small frame sizes.
+   * Filters: Filters now receive finite mFrameCount values in render mode instead of unspecified (-1).
+   * Filters: Yadif mode of deinterlace filter was not caching internal frames efficiently.
+   * Filters: Fixed crash in certain paths when a filter frame request fails.
+   * Filters: Fixed occasional crashes with aligned scanline requests, particularly with cropping.
+   * Filters: Fixed artifacts in resize filter on right border with certain filter+ratio combos, pre-SSE4.1 CPUs, and YCbCr formats.
+   * Capture: Custom video format had HDYC listed twice instead of HDYC and v210.
+   * Images: Fixed hang in PNG encoder.
+   * Render: Added workaround for random hang when aborting render while using XviD with threaded compression enabled.
+   * AMD64: Fixed crash in resampler with certain filter/ratio combinations.
+
+   [regressions fixed]
+   * UI: Timeline scrubbing is more responsive again when dealing with files that have long delta frame runs (since 1.9.1).
+   * Render: Fixed hang if there is a string of duplicate frames longer than the video pipeline (since 1.9.1).
+   * Render: Fixed playback stopping at the end of the audio stream even if the video stream is longer.
+   * Filters: Fixed some caching and frame numbering issues with filters that have non-zero lag (since 1.9.1).
+
+Build 31536 (1.9.1, experimental): [March 28, 2009]
+   [features added]
+   * Render: Audio buffer size is now tunable in Options > Preferences.
+   * Render: Blitters are now cached for additional speed.
+   * Render: Performance sub-panel of status window now shows more appropriate stats.
+   * Render: Navigation keyboard shortcuts now work during preview.
+   * Filters: IVTC is now a video filter.
+   * Filters: Convert format filter now has options for UYVY and YUY2.
+   * Filters: Field swap now supports YCbCr formats.
+   * Filters: The filter system now automatically prerolls forward to compensate for filters with a lag (delay from input to output).
+   * Filters: New interlace filter to generate interlaced video.
+   * Filters: New interpolate filter to resample to different frame rates with blending.
+   * Filters: Added ELA, Yadif, and frame rate doubling modes to deinterlace filter.
+   * Filters: The filter system is now better at detecting and reporting errors in filters.
+   * Filters: Fixed overrun crash in box blur filter if radius exceeds size of image.
+   * PluginAPI: Video filters can request multiple source frames per output frame.
+   * PluginAPI: Video filters can request aligned scanlines.
+   * PluginAPI: Video filters can initiate direct bypass for frames during smart rendering.
+   * Capture: Fixed wrong area captured by screen capture driver with OpenGL acceleration enabled, rescale on, and mouse pointer capture enabled.
+   * Display: Added options for zooming to 12%% and 6%%.
+   * UI: Added Ctrl+Shift+F7 as a shortcut for batching Save AVI.
+   * UI: Preview no longer sticks if you seek to the end of the timeline.
+   * UI: Curve editor position now updates at end of timeline.
+   * AVI: Added DVSD to list of video formats that only have key frames.
+   
+   [bugs fixed]
+   * Audio duration in File Information was incorrect for VBR audio streams.
+   * Fixed crashes with test videos when input color format was set to 4:4:4 YCbCr (YV24).
+   * Audio display now updates after preview stops.
+   * Decoders: MJPEG decoder was decoding blocks in the wrong order for 4:2:0 mode.
+   * Decoders: MJPEG decoder didn't safely handle corrupt data having skip-16 codes overruning the coefficient matrix.
+   * Filters: Fixed cases where resize filter was not using fast paths for 1:1 resampling along an axis.
+   * Filters: Fixed crash in warpsharp filter due to out of bounds displacement vectors.
+   * Filters: Fixed script error when loading configurations with warpsharp filters.
+   * Filters: The filter system no longer tries Y8 before other YCbCr formats if the filter cannot support a RGB32 source.
+   * Filters: The resize filter was using incorrect border fill colors for 4:4:4 YCbCr (YV24) input.
+   * Capture: Frame rate changes in filters are now respected.
+   * Display: Panes could get stuck in GDI mode if auto-fallback mode was disabled.
+   * Display: Reduced CPU usage when GPU queue becomes full in Direct3D mode with vsync off.
+   * Display: You can no longer resize panes below 1x1.
+   * Render: "Show decompressed output" no longer misses the very first frame if activated at the start of a render.
+   * Render: "Show decompressed output" wasn't using internal video decoders.
+   
+   [regressions fixed]
+   * Filters: Sampling with levels filter didn't work when the input format was YCbCr (since 1.9.0).
+   * Filters: Filter preview broke when toggling luma mode on levels filter with YCbCr input (since 1.9.0).
+   * Filters: Fixed cropping bug where tall, narrow videos didn't crop properly.
+   * Filters: Brightness/contrast filter was broken for RGB32 input (since 1.9.0).
+   * Render: Fixed smart rendering issue that could cause broken frames at the start of a new processed section (since 1.8.1).
+   * Fixed a rare crash when doing YUV to RGB conversion on SSE2 capable systems (since 1.9.0).
+   * Settings saving in the Save Segmented AVI... dialog was scrambled (since 1.9.0).
+   * Fixed an off-by-one error in the frame count limit for segmented saving.
+
+Build 30586 (1.9.0, experimental): [December 21, 2008]
+   [features added]
+   * Added internal Huffyuv decoder.
+   * Added "crop to selection" command.
+   * Frameserver startup is now scriptable.
+   * MJPEG decoder now uses Rec. 601 color space instead of JFIF.
+   * 4:4:4 planar YCbCr (YV24) is now exposed in the Video Color Depth dialog.
+   * Added support for 4:2:2 10-bit YCbCr (v210) and 4:2:0 YCbCr with interleaved chroma (NV12).
+   * Moved "add as batch job" form of save operations to a separate menu to reduce confusion.
+   * The audio playback device can now be selected in Preferences.
+   * AMD64: MJPEG decoder is now available.
+   * Filters: Warp sharp added as internal filter with YCbCr 4:4:4 support.
+   * Filters: Perspective filter now supports bicubic filtering.
+   * Filters: Blur and Blur More are now supported on AMD64.
+   * Filters: Brightness/contrast filter now supports RGB24 and planar YCbCr formats.
+   * Filters: Levels filter can now work directly in YCbCr formats when luma mode is enabled.
+   * Filters: Bob doubler now allows deinterlacing to be disabled.
+   * Filters: Preview now keeps current position.
+   * Filters: Holding SHIFT when adjusting cropping now aligns to 16 pixel size boundaries.
+   * Display: OpenGL driver supports bicubic filtering.
+   * Display: The fallback to GDI when the app goes into the background can now be disabled.
+   * D3D: Added high-precision pixel shader 2.0 display mode with dithering for slightly better color fidelity.
+   * D3D: HDYC, v210, and Pal8 are now decoded in hardware.
+   * JobControl: The system can now also be put into sleep or hibernation at the end of job queue processing.
+
+   [bugs fixed]
+   * Fix for ACM decoding/encoding errors with some audio codecs related to requesting a conversion with 0 source bytes.
+   * SaveWAV() script command showed error dialogs instead of redirecting the errors.
+   * Audio display: Ctrl+Drag now explicitly says "shift audio" to avoid confusion.
+   * Capture: Fixed accumulation of "no device found" entries in the menu.
+   * DDraw: Workaround for rare DWMAPI.DLL->USER32.DLL load errors on XP.
+   * Display: Fixed bug where panes didn't redraw when disabled during a render operation.
+   * Display: Fixed disabled panes or panes showing end frames drawing bluish colors rather than the correct Windows background color.
+
+Build %build% (1.8.8, stable): [January 4, 2009]
+   [bugs fixed]
+   * Command line: MPEG parser status dialog ate Ctrl+C/Break.
+   * Command line: Ctrl+C/Break while running the job queue (/r) now skips the rest of the queue.
+   * PluginAPI: DetectBySignature() now receives correct file size instead of zero.
+   * PluginAPI: Fixed frame tracking bug in default video decoder object that caused intermittent failures.
+
+   [regressions fixed]
+   * JobControl: Command-line run (/r) was broken by retry logic (since 1.8.7).
+   * Filters: Blur and Blur More no longer write broken config lines into scripts (since 1.8.0).
+
+Build 30080 (1.8.7, stable): [December 21, 2008]
+   [bugs fixed]
+   * Wheel scrolling now works in the filter crop dialog.
+   * Added clamp in audio conversion dialog to prevent invalid custom sampling rates.
+   * DV: Audio error concealment now works when the PAL/NTSC bit in a frame is incorrect.
+   * Capture: Added option to ignore DirectShow video timestamps when capture driver timing is busted.
+   * JobControl: Rewrote sync mechanism to fix problems with multiple machines attempting to run the same job.
+
+   [regressions fixed]
+   * JobControl: Fixed crash if job list couldn't be flushed on exit.
+
+Build 30009 (1.8.6, stable): [September 21, 2008]
+   [bugs fixed]
+   * Wheel scrolling in the Set Text Information dialog closes the edit control.
+   * Save Segmented AVI now works with VBR audio.
+   * Animated GIF export now fails with an error if the current output format is compressed or otherwise not supported.
+   * JobControl: Fixed crash when one machine attempts to run a job in distributed mode right when another machine deletes it.
+   * JobControl: The filter crop mode saved in jobs was opposite from selected. (This only affected YCbCr cropping.)
+   * Capture: Fixed crash when capture driver sends audio samples when DirectShow graph is not running.
+   * D3D: Fixed sporadic crash on lost device.
+   * D3D: Fixed Direct3D errors when display debug information is enabled and a video filter fails to initialize.
+   * Frameserver: Frame rate adjustments weren't always propagated correctly.
+
+   [regressions fixed]
+   * Fixed crash when using fast/normal recompress mode without a video codec.
+   * Fixed divide by zero crash when loading video and a video filter in the list is unable to initialize.
+   * Changing the "source rate adjustment" option no longer invalidates the current selection.
+   * Rendering would loop endlessly if an error occurred during video compression and threaded compression was disabled.
+   * Disabling the "directly decode YCbCr formats" option works again.
+   * Filters: lMicrosecsPerFrame and lMicrosecsPerSrcFrame were reporting milliseconds (broken since 1.8.0).
+   * JobControl: Fixed case where a non-distributed "load job list" command can fail due to erroneously running distributed-mode code.
+   * JobControl: Fixed problem where dialog would suddenly close when editing job names.
+   * Script: Fixed crash when removing video filter from filter chain.
+   * DV: Audio decoding works again with NTSC DV files (broken since 1.8.4).
+
+Build 29963 (1.8.5, stable): [August 15, 2008]
+   [bugs fixed]
+   * Capture: Fixed a possible crash when loading device settings.
+
+   [regressions fixed]
+   * Video filters which used GDI rendering in in-place mode but only requested a DC for one buffer now work.
+
+Build 29958 (1.8.4, stable): [August 9, 2008]
+   [features added]
+   * Export > Raw Audio defaults to .mp3 extension when the audio track is in MPEG layer III format.
+   * Capture: Optimized display code slightly when main window is minimized.
+
+   [bugs fixed]
+   * Fixed another crash with uncompressed paletted video.
+   * Fixed several dialogs that had placeholder icons.
+   * "Open shared job list" dialog now shows the correct title.
+   * Fixed shared job list sync errors when using a job file originally saved from non-shared mode.
+   * Image sequence export jobs didn't reload properly.
+   * Perspective filter no longer shows garbage preview frame before a frame is sampled.
+   * Capture: The "track active window client area" setting of the screencap driver is now saved properly.
+   * Capture: Fixed crash when exiting Set Custom Format dialog with no width or height selected.
+   * DV: Fixed noise when audio switches between 12-bit and 16-bit encoding.
+   * D3D: Fixed wrong-boxing of video when source frame is YCbCr and larger than screen.
+   
+   [regressions fixed]
+   * Video > Select Range dialog now works again. It now sets the selection.
+
+Build 29896 (1.8.3, stable): [July 20, 2008]
+   [regressions fixed]
+   * Fixed issue where main window failed to appear on first start on some systems.
+
+Build 29883 (1.8.2, stable): [July 19, 2008]
+   [features added]
+   * JobControl: Job control dialog now shows machine name and PID.
+   * Filters: Added mOutputFrame field to VDXFilterStateInfo for reliable frame rate change operations.
+
+   [bugs fixed]
+   * The window maximized state is also saved in addition to position/size.
+   * Reopening a video file that has multiple audio streams no longer loses secondary streams.
+   * Scene detection now works again when RGB565 or a YCbCr format is selected as the input format.
+   * Input preview didn't start in the correct place if a frame rate changing filter was present.
+   * The picture format tokens (p/P) in the timestamp UI options sometimes started from 1 instead of 0 due to rounding errors.
+   * Fixed stall at frame 0 when attempting to render with a VBR audio stream that has an extremely low data rate.
+   * Filters: Fixed field order swapping in bob doubler.
+   * JobControl: Fixed distributed list sync errors due to mixing up revision numbers when switching job files.
+   * Capture: Process and thread priority are now restored after capture rather than being unilaterally reset to normal/normal.
+   
+   [regressions fixed]
+   * Fixed audio desyncs with frame rate conversion.
+   * Type-1 DV audio works again.
+   * The video.SetRange() command works in unadjusted source milliseconds again.
+   * Fixed read errors with AVI files that have frames out of order in the index. (Note: This is rare, and often actually a sign of a corrupt index.)
+   * Filters: Filter sampling didn't work correctly if there was a conversion required at the start of the filter.
+   * Capture: Fixed crash in screencap driver with OpenGL capture disabled.
+
+Build 29808 (1.8.1, stable): [June 15, 2008]
+   [features added]
+   * The 'run as job' setting is now saved in the Save AVI dialog.
+   * Added distributed job queue mode.
+   * Added bob and non-interlaced field display modes to render preview.
+   * Added new test video mode: interlaced cube.
+   * Added option to run video compressor in a separate thread for better dual core/SMP performance.
+   * YCbCr resampler is now SSE4.1 optimized.
+   * Added command-line switches for minimizing/maximizing the window on startup and setting process priority.
+   * AMD64: The threshold, grayscale, levels, logo, and brightness/contrast video filters are now available.
+   * Plugins: Fixed bugs with and raised size limits for serialized input plugin options data.
+
+   [bugs fixed]
+   * Fixed cases where the crop/letterbox to aspect ratio options in the resize filter were broken.
+   * Fixed another rare crash when exiting filter list dialog.
+   * Fixed Postpone and Delete buttons in job control dialog sometimes not updating when a job state changes.
+   * Fixed swapping of AVI superindex and subindex settings.
+   * Fixed bugs with cropping in filter chain with YUY2 or UYVY formats.
+   * Mouse wheel scrolling with Shift held down (by key frame) now works properly.
+   * Fixed infinite loop when attempting to convert a pal8 source to 4:2:0 YCbCr.
+   * The initial load of AVI files is now faster over a network.
+   * TARGA files are no longer written all black when 32-bit RGB output is used.
+   * Added workaround for "image not in Y or YCbCr format" errors when reading JPEGs from a RAZR V3 phone.
+   * Deleting a filter in the filter list no longer causes the checkboxes to desync from the actual filter enable states.
+   * AVI: Files with truncated hierarchical AVI indices no longer result in "missing 'movi' chunk" errors and can now be recovered.
+   * DV: Fixed decoding issue that resulted in some lost blocks.
+   * DDraw: Fixed occasional crash when another application forces full-screen mode.
+   * Capture: Fixed crash in OpenGL screen capture mode related to occlusion query based frame dropping.
+   * Capture: Fixed hang on shutdown when exiting with OpenGL screen capture mode active.
+
+   [regressions fixed]
+   * Fixed crash when a script specifies arguments for a video filter that doesn't take any.
+   * Data rate was reported incorrectly for the video stream in the status dialog.
+   * Fixed audio display.
+   * Fixed crashes and decompression errors with paletted video.
+   * Filter preview no longer shows bogus frames when previewing a filter chain with edits on the timeline and no frame rate changing filters.
+   * Filters: Codec-friendly alignment works in resize filter again.
+
+Build 29393 (1.8.0, experimental): [February 24, 2008]
+   [breaking changes]
+   * The old support for reading "striped AVIs" has been removed.
+   
+   [features added]
+   * Alternate audio streams in an AVI file can now be chosen.
+   * Added fallback audio decoders for mu-law, A-law, MP2, and MP3 formats.
+   * Video files with audio tracks can also be used for replacing existing audio.
+   * MP3 files without a WAV header can now be used as input.
+   * Added support for writing AVI files with VBR audio.
+   * The default frame rate for loaded image sequences can now be changed in Preferences.
+   * The time knob can be dragged during a preview.
+   * Mark-in and mark-out commands now work during preview.
+   * Added new "time stretch" audio filter.
+   * Increased precision of ratios for audio stretch filters.
+   * Added "zone plate" test video mode.
+   * Changes to the input color format are now reflected in the preview panes.
+   * Added support for non-standard 15fps MPEG-1 video streams.
+   * VBR warning for AVI audio streams can now be toggled in Preferences.
+   * Filters: Can now be toggled on and off in the filter list.
+   * Filters: Fast YCbCr cropping is now supported.
+   * Filters: Flip vertically, grayscale, and resize now support direct planar YCbCr processing.
+   * Filters: Added "convert format" video filter.
+   * Filters: Redesigned color popup; hold down SHIFT. Now works after stretching video window.
+   * Script: Implemented string+int, string+long, and string+double.
+   * Plugins: Input driver plugins can now delegate video decompression to VirtualDub.
+   * Capture: Added /capfilealloc switch to preallocate capture files from the command line.
+   * Hex editor: Now supports Unicode filenames.
+
+   [bugs fixed]
+   * Cmdline: Ctrl+C/Break when a render is running also aborts a running script.
+   * If a particular input driver is forced when opening a video, that driver is remembered in a job.
+   * Video filter dialog didn't update the indicated frame sizes properly when deleting a filter.
+   * Fixed slight delay when a rendering job stops.
+   * Optimized AVI frame index code to avoid extreme delay when starting a direct stream mode operation on an AVI file with only one key frame.
+   * Progress bar is now lies less when reindexing large AVI files.
+   * Fixed issue in AVI aggressive recovery algorithm that could cause valid chunks to be missed.
+   * Selection was not properly saved in .vcf files, causing it to be invalid on load if edits had occurred.
+   * Fixed crash when dragging curve points with no video loaded.
+   * Video/audio error mode dialogs weren't properly disabling options not supported for the current input file.
+   * Capture: Video filter list now reflects active capture format.
+   * D3D: Fixed slowdown when bicubic mode is enabled.
+
+Build 28346 (1.7.8, stable): [February 12, 2008]
    [bugs fixed]
    * Capture: Fixed crash when starting capture from command line with filters and preview acceleration enabled.
    * Capture: Fixed issues with custom DirectShow filters not reconnecting.

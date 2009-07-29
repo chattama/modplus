@@ -22,6 +22,7 @@
 #include <vd2/system/registry.h>
 #include <vd2/system/math.h>
 #include <vd2/system/w32assist.h>
+#include <vd2/VDLib/Dialog.h>
 
 #include <list>
 #include <utility>
@@ -45,6 +46,7 @@ extern HINSTANCE g_hInst;
 uint32& VDPreferencesGetRenderOutputBufferSize();
 uint32& VDPreferencesGetRenderWaveBufferSize();
 uint32& VDPreferencesGetRenderVideoBufferCount();
+uint32& VDPreferencesGetRenderAudioBufferSeconds();
 void VDSavePreferences();
 
 ///////////////////////////////////////////
@@ -77,7 +79,7 @@ protected:
 void VDDialogAudioConversionW32::RecomputeBandwidth() {
 	long bps=0;
 
-	if (	 IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_NOCHANGE))	bps = mpSource ? mpSource->getWaveFormat()->nSamplesPerSec : 0;
+	if (	 IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_NOCHANGE))	bps = mpSource ? mpSource->getWaveFormat()->mSamplingRate : 0;
 	else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_11KHZ))		bps = 11025;
 	else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_22KHZ))		bps = 22050;
 	else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_44KHZ))		bps = 44100;
@@ -87,10 +89,10 @@ void VDDialogAudioConversionW32::RecomputeBandwidth() {
 	else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_CUSTOM))
 		bps = GetDlgItemInt(mhdlg, IDC_SAMPLINGRATE_CUSTOM_VAL, NULL, FALSE);
 
-	if (	 IsDlgButtonChecked(mhdlg, IDC_PRECISION_NOCHANGE))	bps *= mpSource ? mpSource->getWaveFormat()->wBitsPerSample>8 ? 2 : 1 : 1;
+	if (	 IsDlgButtonChecked(mhdlg, IDC_PRECISION_NOCHANGE))	bps *= mpSource ? mpSource->getWaveFormat()->mSampleBits>8 ? 2 : 1 : 1;
 	else if (IsDlgButtonChecked(mhdlg, IDC_PRECISION_16BIT))		bps *= 2;
 
-	if (	 IsDlgButtonChecked(mhdlg, IDC_CHANNELS_NOCHANGE))	bps *= mpSource ? mpSource->getWaveFormat()->nChannels>1 ? 2 : 1 : 1;
+	if (	 IsDlgButtonChecked(mhdlg, IDC_CHANNELS_NOCHANGE))	bps *= mpSource ? mpSource->getWaveFormat()->mChannels>1 ? 2 : 1 : 1;
 	else if (IsDlgButtonChecked(mhdlg, IDC_CHANNELS_STEREO))		bps *= 2;
 
 	char buf[128];
@@ -145,8 +147,17 @@ INT_PTR VDDialogAudioConversionW32::DlgProc(UINT message, WPARAM wParam, LPARAM 
 				else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_22KHZ   )) mOpts.audio.new_rate = 22050;
 				else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_44KHZ   )) mOpts.audio.new_rate = 44100;
 				else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_48KHZ   )) mOpts.audio.new_rate = 48000;
-				else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_CUSTOM))
-					mOpts.audio.new_rate = GetDlgItemInt(mhdlg, IDC_SAMPLINGRATE_CUSTOM_VAL, NULL, FALSE);
+				else if (IsDlgButtonChecked(mhdlg, IDC_SAMPLINGRATE_CUSTOM)) {
+					BOOL valid = FALSE;
+					UINT hz = GetDlgItemInt(mhdlg, IDC_SAMPLINGRATE_CUSTOM_VAL, &valid, FALSE);
+					if (!valid || !hz || hz > 10000000) {
+						SetFocus(GetDlgItem(mhdlg, IDC_SAMPLINGRATE_CUSTOM_VAL));
+						MessageBeep(MB_ICONEXCLAMATION);
+						return TRUE;
+					}
+
+					mOpts.audio.new_rate = hz;
+				}
 
 				if		(IsDlgButtonChecked(mhdlg, IDC_PRECISION_NOCHANGE)) mOpts.audio.newPrecision = DubAudioOptions::P_NOCHANGE;
 				else if	(IsDlgButtonChecked(mhdlg, IDC_PRECISION_8BIT    )) mOpts.audio.newPrecision = DubAudioOptions::P_8BIT;
@@ -184,17 +195,17 @@ void VDDialogAudioConversionW32::ReinitDialog() {
 	if (mpSource) {
 		char buf[128];
 
-		const WAVEFORMATEX *pwfex = mpSource->getWaveFormat();
-		wsprintf(buf, "No change (%ldHz)", pwfex->nSamplesPerSec);
+		const VDWaveFormat *pwfex = mpSource->getWaveFormat();
+		wsprintf(buf, "No change (%ldHz)", pwfex->mSamplingRate);
 		SetDlgItemText(mhdlg, IDC_SAMPLINGRATE_NOCHANGE, buf);
 
-		wsprintf(buf, "No change (%ld-bit)", pwfex->wBitsPerSample>8 ? 16 : 8);
+		wsprintf(buf, "No change (%ld-bit)", pwfex->mSampleBits>8 ? 16 : 8);
 		SetDlgItemText(mhdlg, IDC_PRECISION_NOCHANGE, buf);
 
-		if (pwfex->nChannels > 2)
-			wsprintf(buf, "No change (%dch.)", pwfex->nChannels);
+		if (pwfex->mChannels > 2)
+			wsprintf(buf, "No change (%dch.)", pwfex->mChannels);
 		else
-			wsprintf(buf, "No change (%s)", pwfex->nChannels>1 ? "stereo" : "mono");
+			wsprintf(buf, "No change (%s)", pwfex->mChannels>1 ? "stereo" : "mono");
 		SetDlgItemText(mhdlg, IDC_CHANNELS_NOCHANGE, buf);
 	}
 
@@ -375,6 +386,9 @@ void VDDialogVideoDepthW32::ReinitDialog() {
 	case nsVDPixmap::kPixFormat_YUV422_YUYV:
 		CheckDlgButton(mhdlg, IDC_INPUT_YUV422_YUY2, TRUE);
 		break;
+	case nsVDPixmap::kPixFormat_YUV444_Planar:
+		CheckDlgButton(mhdlg, IDC_INPUT_YUV444_PLANAR, TRUE);
+		break;
 	case nsVDPixmap::kPixFormat_YUV422_Planar:
 		CheckDlgButton(mhdlg, IDC_INPUT_YUV422_PLANAR, TRUE);
 		break;
@@ -386,6 +400,15 @@ void VDDialogVideoDepthW32::ReinitDialog() {
 		break;
 	case nsVDPixmap::kPixFormat_Y8:
 		CheckDlgButton(mhdlg, IDC_INPUT_Y8, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV422_V210:
+		CheckDlgButton(mhdlg, IDC_INPUT_YUV422_V210, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV422_UYVY_709:
+		CheckDlgButton(mhdlg, IDC_INPUT_YUV422_UYVY_709, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV420_NV12:
+		CheckDlgButton(mhdlg, IDC_INPUT_YUV420_NV12, TRUE);
 		break;
 	case nsVDPixmap::kPixFormat_RGB888:
 	default:
@@ -412,6 +435,9 @@ void VDDialogVideoDepthW32::ReinitDialog() {
 	case nsVDPixmap::kPixFormat_YUV422_YUYV:
 		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV422_YUY2, TRUE);
 		break;
+	case nsVDPixmap::kPixFormat_YUV444_Planar:
+		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV444_PLANAR, TRUE);
+		break;
 	case nsVDPixmap::kPixFormat_YUV422_Planar:
 		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV422_PLANAR, TRUE);
 		break;
@@ -423,6 +449,15 @@ void VDDialogVideoDepthW32::ReinitDialog() {
 		break;
 	case nsVDPixmap::kPixFormat_Y8:
 		CheckDlgButton(mhdlg, IDC_OUTPUT_Y8, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV422_V210:
+		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV422_V210, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV422_UYVY_709:
+		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV422_UYVY_709, TRUE);
+		break;
+	case nsVDPixmap::kPixFormat_YUV420_NV12:
+		CheckDlgButton(mhdlg, IDC_OUTPUT_YUV420_NV12, TRUE);
 		break;
 	case nsVDPixmap::kPixFormat_RGB888:
 	default:
@@ -454,6 +489,14 @@ void VDDialogVideoDepthW32::Commit() {
 		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_YUV410_Planar;
 	else if (IsDlgButtonChecked(mhdlg, IDC_INPUT_Y8))
 		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_Y8;
+	else if (IsDlgButtonChecked(mhdlg, IDC_INPUT_YUV444_PLANAR))
+		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_YUV444_Planar;
+	else if (IsDlgButtonChecked(mhdlg, IDC_INPUT_YUV422_V210))
+		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_YUV422_V210;
+	else if (IsDlgButtonChecked(mhdlg, IDC_INPUT_YUV422_UYVY_709))
+		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_YUV422_UYVY_709;
+	else if (IsDlgButtonChecked(mhdlg, IDC_INPUT_YUV420_NV12))
+		mOpts.video.mInputFormat = nsVDPixmap::kPixFormat_YUV420_NV12;
 
 	mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_RGB888;
 	if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_AUTOSELECT))
@@ -476,6 +519,14 @@ void VDDialogVideoDepthW32::Commit() {
 		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_YUV410_Planar;
 	else if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_Y8))
 		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_Y8;
+	else if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_YUV444_PLANAR))
+		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_YUV444_Planar;
+	else if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_YUV422_V210))
+		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_YUV422_V210;
+	else if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_YUV422_UYVY_709))
+		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_YUV422_UYVY_709;
+	else if (IsDlgButtonChecked(mhdlg, IDC_OUTPUT_YUV420_NV12))
+		mOpts.video.mOutputFormat = nsVDPixmap::kPixFormat_YUV420_NV12;
 }
 
 bool VDDisplayVideoDepthDialog(VDGUIHandle hParent, DubOptions& opts) {
@@ -490,7 +541,7 @@ bool VDDisplayVideoDepthDialog(VDGUIHandle hParent, DubOptions& opts) {
 //
 ///////////////////////////////////////////////////////////////////////////
 
-static long outputBufferSizeArray[]={
+static const long outputBufferSizeArray[]={
 	128*1024,
 	192*1024,
 	256*1024,
@@ -511,7 +562,7 @@ static long outputBufferSizeArray[]={
 	64*1024*1024,
 };
 
-static long waveBufferSizeArray[]={
+static const long waveBufferSizeArray[]={
 	8*1024,
 	12*1024,
 	16*1024,
@@ -535,7 +586,7 @@ static long waveBufferSizeArray[]={
 	8*1024*1024
 };
 
-static long pipeBufferCountArray[]={
+static const long pipeBufferCountArray[]={
 	4,
 	6,
 	8,
@@ -551,93 +602,122 @@ static long pipeBufferCountArray[]={
 	256,
 };
 
+static const long audioBufferSizeArray[]={
+	1,
+	2,
+	3,
+	4,
+	6,
+	8,
+	10,
+	12,
+	16,
+	20,
+	24,
+	32,
+	48,
+	64
+};
+
 #define ELEMENTS(x) (sizeof (x)/sizeof(x)[0])
 
-INT_PTR CALLBACK PerformanceOptionsDlgProc( HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	DubOptions *dopt = (DubOptions *)GetWindowLongPtr(hDlg, DWLP_USER);
-	LONG pos;
-	HWND hWndItem;
+class VDDialogPerformanceOptions : public VDDialogFrameW32 {
+public:
+	VDDialogPerformanceOptions() : VDDialogFrameW32(IDD_PERFORMANCE) {}
 
-    switch (message)
-    {
-        case WM_INITDIALOG:
-			SetWindowLongPtr(hDlg, DWLP_USER, lParam);
-			dopt = (DubOptions *)lParam;
+protected:
+	bool OnLoaded();
+	void OnHScroll(uint32 id, int code);
+	void OnDataExchange(bool write);
 
-			hWndItem = GetDlgItem(hDlg, IDC_OUTPUT_BUFFER);
-			SendMessage(hWndItem, TBM_SETRANGE, FALSE, MAKELONG(0,sizeof outputBufferSizeArray / sizeof outputBufferSizeArray[0] - 1));
-			SendMessage(hWndItem, TBM_SETPOS, TRUE, NearestLongValue(VDPreferencesGetRenderOutputBufferSize(), outputBufferSizeArray, ELEMENTS(outputBufferSizeArray)));
-			SendMessage(hDlg, WM_HSCROLL, 0, (LPARAM)hWndItem);
-			hWndItem = GetDlgItem(hDlg, IDC_WAVE_INPUT_BUFFER);
-			SendMessage(hWndItem, TBM_SETRANGE, FALSE, MAKELONG(0,sizeof waveBufferSizeArray / sizeof waveBufferSizeArray[0] - 1));
-			SendMessage(hWndItem, TBM_SETPOS, TRUE, NearestLongValue(VDPreferencesGetRenderWaveBufferSize(), waveBufferSizeArray, ELEMENTS(waveBufferSizeArray)));
-			SendMessage(hDlg, WM_HSCROLL, 0, (LPARAM)hWndItem);
-			hWndItem = GetDlgItem(hDlg, IDC_PIPE_BUFFERS);
-			SendMessage(hWndItem, TBM_SETRANGE, FALSE, MAKELONG(0,sizeof pipeBufferCountArray / sizeof pipeBufferCountArray[0] - 1));
-			SendMessage(hWndItem, TBM_SETPOS, TRUE, NearestLongValue(VDPreferencesGetRenderVideoBufferCount(), pipeBufferCountArray, ELEMENTS(pipeBufferCountArray)));
-			SendMessage(hDlg, WM_HSCROLL, 0, (LPARAM)hWndItem);
-            return (TRUE);
+	VDStringW	mOutputBufferFormat;
+	VDStringW	mWaveBufferFormat;
+	VDStringW	mVideoBufferFormat;
+	VDStringW	mAudioBufferFormat;
+};
 
-		case WM_HSCROLL:
-			{
-				char buf[128];
+bool VDDialogPerformanceOptions::OnLoaded() {
+	mOutputBufferFormat = GetControlValueString(IDC_OUTPUT_BUFFER_SIZE);
+	mWaveBufferFormat = GetControlValueString(IDC_WAVE_BUFFER_SIZE);
+	mVideoBufferFormat = GetControlValueString(IDC_STATIC_VIDEO_BUFFERS);
+	mAudioBufferFormat = GetControlValueString(IDC_STATIC_AUDIO_BUFFER);
 
-				pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
+	return VDDialogFrameW32::OnLoaded();
+}
 
-				switch(GetWindowLongPtr((HWND)lParam, GWL_ID)) {
-				case IDC_OUTPUT_BUFFER:
-					if (pos >= 5)
-						wsprintf(buf, "VirtualDub will use %ldMB of memory for output buffering.",outputBufferSizeArray[pos]>>20);
-					else
-						wsprintf(buf, "VirtualDub will use %ldKB of memory for output buffering.",outputBufferSizeArray[pos]>>10);
+void VDDialogPerformanceOptions::OnHScroll(uint32 id, int code) {
+	sint32 pos = TBGetValue(id);
 
-					SetDlgItemText(hDlg, IDC_OUTPUT_BUFFER_SIZE, buf);
-					return TRUE;
+	switch(id) {
+	case IDC_OUTPUT_BUFFER:
+		{
+			long bufferSize = outputBufferSizeArray[pos];
 
-				case IDC_WAVE_INPUT_BUFFER:
-					if (pos >= 14)
-						wsprintf(buf, "Replacement WAV audio tracks will use %ldMB of memory for input buffering.",waveBufferSizeArray[pos]>>20);
-					else
-						wsprintf(buf, "Replacement WAV audio tracks will use %ldKB of memory for input buffering.",waveBufferSizeArray[pos]>>10);
+			VDStringW s;
+			if (bufferSize >= 1048576)
+				s.sprintf(L"%uMB", bufferSize >> 20);
+			else
+				s.sprintf(L"%uKB", bufferSize >> 10);
 
-					SetDlgItemText(hDlg, IDC_WAVE_BUFFER_SIZE, buf);
-					return TRUE;
+			SetControlTextF(IDC_OUTPUT_BUFFER_SIZE, mOutputBufferFormat.c_str(), s.c_str());
+		}
+		break;
 
-				case IDC_PIPE_BUFFERS:
-					wsprintf(buf, "Pipelining will be limited to %ld buffers.\n", pipeBufferCountArray[pos]);
-					SetDlgItemText(hDlg, IDC_STATIC_PIPE_BUFFERS, buf);
-					return TRUE;
-				}
-			}
-			break;
+	case IDC_WAVE_INPUT_BUFFER:
+		{
+			long bufferSize = waveBufferSizeArray[pos];
 
-        case WM_COMMAND:
-			switch(LOWORD(wParam)) {
-			case IDOK:
-				{
-					long index;
+			VDStringW s;
+			if (bufferSize >= 1048576)
+				s.sprintf(L"%uMB", bufferSize >> 20);
+			else
+				s.sprintf(L"%uKB", bufferSize >> 10);
 
-					index = SendMessage(GetDlgItem(hDlg, IDC_OUTPUT_BUFFER), TBM_GETPOS, 0, 0);
-					VDPreferencesGetRenderOutputBufferSize() = outputBufferSizeArray[index];
+			SetControlTextF(IDC_WAVE_BUFFER_SIZE, mOutputBufferFormat.c_str(), s.c_str());
+		}
+		break;
 
-					index = SendMessage(GetDlgItem(hDlg, IDC_WAVE_INPUT_BUFFER), TBM_GETPOS, 0, 0);
-					VDPreferencesGetRenderWaveBufferSize() = waveBufferSizeArray[index];
+	case IDC_VIDEO_BUFFERS:
+		SetControlTextF(IDC_STATIC_VIDEO_BUFFERS, mVideoBufferFormat.c_str(), pipeBufferCountArray[pos]);
+		break;
 
-					index = SendMessage(GetDlgItem(hDlg, IDC_PIPE_BUFFERS), TBM_GETPOS, 0, 0);
-					VDPreferencesGetRenderVideoBufferCount() = pipeBufferCountArray[index];
+	case IDC_AUDIO_BUFFER:
+		SetControlTextF(IDC_STATIC_AUDIO_BUFFER, mAudioBufferFormat.c_str(), audioBufferSizeArray[pos]);
+		break;
+	}
+}
 
-					VDSavePreferences();
-				}
-				EndDialog(hDlg, TRUE);
-				return TRUE;
-			case IDCANCEL:
-				EndDialog(hDlg, FALSE);
-				return TRUE;
-			}
-            break;
-    }
-    return FALSE;
+void VDDialogPerformanceOptions::OnDataExchange(bool write) {
+	if (write) {
+		VDPreferencesGetRenderOutputBufferSize() = outputBufferSizeArray[TBGetValue(IDC_OUTPUT_BUFFER)];
+		VDPreferencesGetRenderWaveBufferSize() = waveBufferSizeArray[TBGetValue(IDC_WAVE_INPUT_BUFFER)];
+		VDPreferencesGetRenderVideoBufferCount() = pipeBufferCountArray[TBGetValue(IDC_VIDEO_BUFFERS)];
+		VDPreferencesGetRenderAudioBufferSeconds() = audioBufferSizeArray[TBGetValue(IDC_AUDIO_BUFFER)];
+
+		VDSavePreferences();
+	} else {
+		TBSetRange(IDC_OUTPUT_BUFFER, 0, sizeof outputBufferSizeArray / sizeof outputBufferSizeArray[0] - 1);
+		TBSetValue(IDC_OUTPUT_BUFFER, NearestLongValue(VDPreferencesGetRenderOutputBufferSize(), outputBufferSizeArray, ELEMENTS(outputBufferSizeArray)));
+		OnHScroll(IDC_OUTPUT_BUFFER, 0);
+
+		TBSetRange(IDC_WAVE_INPUT_BUFFER, 0, sizeof waveBufferSizeArray / sizeof waveBufferSizeArray[0] - 1);
+		TBSetValue(IDC_WAVE_INPUT_BUFFER, NearestLongValue(VDPreferencesGetRenderWaveBufferSize(), waveBufferSizeArray, ELEMENTS(waveBufferSizeArray)));
+		OnHScroll(IDC_WAVE_INPUT_BUFFER, 0);
+
+		TBSetRange(IDC_VIDEO_BUFFERS, 0, sizeof pipeBufferCountArray / sizeof pipeBufferCountArray[0] - 1);
+		TBSetValue(IDC_VIDEO_BUFFERS, NearestLongValue(VDPreferencesGetRenderVideoBufferCount(), pipeBufferCountArray, ELEMENTS(pipeBufferCountArray)));
+		OnHScroll(IDC_VIDEO_BUFFERS, 0);
+
+		TBSetRange(IDC_AUDIO_BUFFER, 0, sizeof audioBufferSizeArray / sizeof audioBufferSizeArray[0] - 1);
+		TBSetValue(IDC_AUDIO_BUFFER, NearestLongValue(VDPreferencesGetRenderAudioBufferSeconds(), audioBufferSizeArray, ELEMENTS(audioBufferSizeArray)));
+		OnHScroll(IDC_AUDIO_BUFFER, 0);
+	}
+}
+
+void VDShowPerformanceDialog(VDGUIHandle hParent) {
+	VDDialogPerformanceOptions dlg;
+
+	dlg.ShowDialog(hParent);
 }
 
 INT_PTR CALLBACK DynamicCompileOptionsDlgProc( HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -679,7 +759,7 @@ INT_PTR CALLBACK DynamicCompileOptionsDlgProc( HWND hDlg, UINT message, WPARAM w
 
 class VDDialogVideoFrameRateW32 : public VDDialogBaseW32 {
 public:
-	inline VDDialogVideoFrameRateW32(DubOptions& opts, VideoSource *pVS, AudioSource *pAS) : VDDialogBaseW32(IDD_VIDEO_FRAMERATE), mOpts(opts), mpVideo(pVS), mpAudio(pAS) {}
+	inline VDDialogVideoFrameRateW32(DubOptions& opts, IVDVideoSource *pVS, AudioSource *pAS) : VDDialogBaseW32(IDD_VIDEO_FRAMERATE), mOpts(opts), mpVideo(pVS), mpAudio(pAS) {}
 
 	bool Activate(VDGUIHandle hParent) { return 0 != ActivateDialog(hParent); }
 
@@ -690,7 +770,7 @@ protected:
 	void RedoIVTCEnables();
 
 	DubOptions& mOpts;
-	VideoSource *const mpVideo;
+	IVDVideoSource *const mpVideo;
 	AudioSource *const mpAudio;
 };
 
@@ -828,7 +908,7 @@ INT_PTR VDDialogVideoFrameRateW32::DlgProc(UINT message, WPARAM wParam, LPARAM l
 								failed = true;
 							else
 								fr = VDFraction(hi, lo);
-						} else if (!fr.Parse(buf) || (double)fr >= 1000000.0) {
+						} else if (!fr.Parse(buf) || fr.asDouble() >= 1000000.0) {
 							failed = true;
 						}
 
@@ -854,33 +934,6 @@ INT_PTR VDDialogVideoFrameRateW32::DlgProc(UINT message, WPARAM wParam, LPARAM l
 					mOpts.video.frameRateDecimation = newFRD;
 					mOpts.video.frameRateTargetHi = newTarget.getHi();
 					mOpts.video.frameRateTargetLo = newTarget.getLo();
-
-					if (IsDlgButtonChecked(mhdlg, IDC_IVTC_RECONFIELDS)) {
-						mOpts.video.fInvTelecine = true;
-						mOpts.video.fIVTCMode = false;
-						mOpts.video.nIVTCOffset = -1;
-						mOpts.video.frameRateDecimation = 1;
-					} else if (IsDlgButtonChecked(mhdlg, IDC_IVTC_RECONFIELDSFIXED)) {
-						BOOL fSuccess;
-						LONG lv = GetDlgItemInt(mhdlg, IDC_IVTCOFFSET, &fSuccess, FALSE);
-
-						mOpts.video.fInvTelecine = true;
-						mOpts.video.fIVTCMode = false;
-						mOpts.video.nIVTCOffset = lv % 5;
-						mOpts.video.fIVTCPolarity = !!IsDlgButtonChecked(mhdlg, IDC_INVPOLARITY);
-						mOpts.video.frameRateDecimation = 1;
-					} else if (IsDlgButtonChecked(mhdlg, IDC_IVTC_RECONFRAMESMANUAL)) {
-						BOOL fSuccess;
-						LONG lv = GetDlgItemInt(mhdlg, IDC_IVTCOFFSET, &fSuccess, FALSE);
-
-						mOpts.video.fInvTelecine = true;
-						mOpts.video.fIVTCMode = true;
-						mOpts.video.nIVTCOffset = lv % 5;
-						mOpts.video.fIVTCPolarity = !!IsDlgButtonChecked(mhdlg, IDC_INVPOLARITY);
-						mOpts.video.frameRateDecimation = 1;
-					} else {
-						mOpts.video.fInvTelecine = false;
-					}
 				}
 
 				End(true);
@@ -897,18 +950,6 @@ INT_PTR VDDialogVideoFrameRateW32::DlgProc(UINT message, WPARAM wParam, LPARAM l
 void VDDialogVideoFrameRateW32::ReinitDialog() {
 	char buf[128];
 
-	CheckDlgButton(mhdlg, IDC_INVTELECINE, mOpts.video.fInvTelecine);
-
-	if (mOpts.video.fInvTelecine) {
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_1), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_2), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_3), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_N), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_VALUE), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_TARGET), FALSE);
-		EnableWindow(GetDlgItem(mhdlg, IDC_FRAMERATE_TARGET), FALSE);
-	}
-
 	if (mOpts.video.frameRateDecimation==1 && mOpts.video.frameRateTargetLo)
 		CheckDlgButton(mhdlg, IDC_DECIMATE_TARGET, TRUE);
 	else
@@ -924,16 +965,17 @@ void VDDialogVideoFrameRateW32::ReinitDialog() {
 		EnableWindow(GetDlgItem(mhdlg, IDC_DECIMATE_VALUE), FALSE);
 
 	if (mOpts.video.frameRateTargetLo) {
-		sprintf(buf, "%.4f", (double)VDFraction(mOpts.video.frameRateTargetHi, mOpts.video.frameRateTargetLo));
+		sprintf(buf, "%.4f", (double)mOpts.video.frameRateTargetHi / (double)mOpts.video.frameRateTargetLo);
 		SetDlgItemText(mhdlg, IDC_FRAMERATE_TARGET, buf);
 	}
 
 	if (mpVideo) {
-		sprintf(buf, "No change (current: %.3f fps)", mpVideo->getRate().asDouble());
+		IVDStreamSource *pVSS = mpVideo->asStream();
+		sprintf(buf, "No change (current: %.3f fps)", pVSS->getRate().asDouble());
 		SetDlgItemText(mhdlg, IDC_FRAMERATE_NOCHANGE, buf);
 
 		if (mpAudio && mpAudio->getLength()) {
-			VDFraction framerate = VDFraction((double)mpVideo->getLength() * mpAudio->getRate().asDouble() / mpAudio->getLength());
+			VDFraction framerate = VDFraction((double)pVSS->getLength() * mpAudio->getRate().asDouble() / mpAudio->getLength());
 			sprintf(buf, "(%.3f fps)", framerate.asDouble());
 			SetDlgItemText(mhdlg, IDC_FRAMERATE_SAMELENGTH_VALUE, buf);
 		} else
@@ -942,13 +984,13 @@ void VDDialogVideoFrameRateW32::ReinitDialog() {
 
 	if (mOpts.video.mFrameRateAdjustLo) {
 		VDFraction fr(mOpts.video.mFrameRateAdjustHi, mOpts.video.mFrameRateAdjustLo);
-		sprintf(buf, "%.4f", (double)fr);
+		sprintf(buf, "%.4f", fr.asDouble());
 
 		VDFraction fr2(fr);
 		VDVERIFY(fr2.Parse(buf));
 
 		if (fr2 != fr)
-			sprintf(buf, "%u/%u (~%.7f)", fr.getHi(), fr.getLo(), (double)fr);
+			sprintf(buf, "%u/%u (~%.7f)", fr.getHi(), fr.getLo(), fr.asDouble());
 
 		SetDlgItemText(mhdlg, IDC_FRAMERATE, buf);
 		CheckDlgButton(mhdlg, IDC_FRAMERATE_CHANGE, TRUE);
@@ -963,23 +1005,10 @@ void VDDialogVideoFrameRateW32::ReinitDialog() {
 		EnableWindow(GetDlgItem(mhdlg, IDC_FRAMERATE), FALSE);
 	}
 
-	if (mOpts.video.fInvTelecine) {
-		if (mOpts.video.fIVTCMode)
-			CheckDlgButton(mhdlg, IDC_IVTC_RECONFRAMESMANUAL, TRUE);
-		else if (mOpts.video.nIVTCOffset<0)
-			CheckDlgButton(mhdlg, IDC_IVTC_RECONFIELDS, TRUE);
-		else
-			CheckDlgButton(mhdlg, IDC_IVTC_RECONFIELDSFIXED, TRUE);
-	} else
-		CheckDlgButton(mhdlg, IDC_IVTC_OFF, TRUE);
-
-	SetDlgItemInt(mhdlg, IDC_IVTCOFFSET, mOpts.video.nIVTCOffset<0 ? 1 : mOpts.video.nIVTCOffset, FALSE);
-	CheckDlgButton(mhdlg, IDC_INVPOLARITY, mOpts.video.fIVTCPolarity);
-
 	RedoIVTCEnables();
 }
 
-bool VDDisplayVideoFrameRateDialog(VDGUIHandle hParent, DubOptions& opts, VideoSource *pVS, AudioSource *pAS) {
+bool VDDisplayVideoFrameRateDialog(VDGUIHandle hParent, DubOptions& opts, IVDVideoSource *pVS, AudioSource *pAS) {
 	VDDialogVideoFrameRateW32 dlg(opts, pVS, pAS);
 
 	return dlg.Activate(hParent);
@@ -993,7 +1022,7 @@ bool VDDisplayVideoFrameRateDialog(VDGUIHandle hParent, DubOptions& opts, VideoS
 
 class VDDialogVideoRangeW32 : public VDDialogBaseW32 {
 public:
-	inline VDDialogVideoRangeW32(DubOptions& opts, VideoSource *pVS) : VDDialogBaseW32(IDD_VIDEO_CLIPPING), mOpts(opts), mpVideo(pVS), mbReentry(false) {}
+	VDDialogVideoRangeW32(DubOptions& opts, const VDFraction& frameRate, VDPosition frameCount, VDPosition& startSel, VDPosition& endSel);
 
 	inline bool Activate(VDGUIHandle hParent) { return 0 != ActivateDialog(hParent); }
 
@@ -1007,31 +1036,46 @@ protected:
 	void LengthMS();
 
 	DubOptions& mOpts;
-	VideoSource *const mpVideo;
+	VDPosition& mSelStart;
+	VDPosition& mSelEnd;
+	VDFraction mFrameRate;
+	VDPosition mFrameCount;
+	VDTime mTotalTimeMS;
 
 	bool mbReentry;
 };
+
+VDDialogVideoRangeW32::VDDialogVideoRangeW32(DubOptions& opts, const VDFraction& frameRate, VDPosition frameCount, VDPosition& startSel, VDPosition& endSel)
+	: VDDialogBaseW32(IDD_VIDEO_CLIPPING)
+	, mOpts(opts)
+	, mSelStart(startSel)
+	, mSelEnd(endSel)
+	, mFrameRate(frameRate)
+	, mFrameCount(frameCount)
+	, mTotalTimeMS(0)
+	, mbReentry(false)
+{
+	mTotalTimeMS = VDRoundToInt64(mFrameCount * mFrameRate.AsInverseDouble() * 1000.0);
+}
 
 void VDDialogVideoRangeW32::MSToFrames(UINT idFrames, UINT idMS) {
 	VDPosition frames;
 	VDTime ms;
 	BOOL ok;
 
-	if (!mpVideo)
-		return;
-
 	ms = GetDlgItemInt(mhdlg, idMS, &ok, FALSE);
 	if (!ok)
 		return;
 	mbReentry = true;
-	frames = mpVideo->msToSamples(ms);
+
+	frames = VDRoundToInt64((double)ms * mFrameRate.asDouble() / 1000.0);
 	SetDlgItemInt(mhdlg, idFrames, (UINT)frames, FALSE);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_MS,
-				(UINT)(mpVideo->samplesToMs(mpVideo->getLength())
+				(UINT)(mTotalTimeMS
 				-GetDlgItemInt(mhdlg, IDC_END_MS, NULL, FALSE)
 				-GetDlgItemInt(mhdlg, IDC_START_MS, NULL, FALSE)), TRUE);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_FRAMES,
-				(UINT)(mpVideo->getLength()
+				(UINT)(mFrameCount
 				-GetDlgItemInt(mhdlg, IDC_END_FRAMES, NULL, FALSE)
 				-GetDlgItemInt(mhdlg, IDC_START_FRAMES, NULL, FALSE)), TRUE);
 	mbReentry = false;
@@ -1042,20 +1086,18 @@ void VDDialogVideoRangeW32::FramesToMS(UINT idMS, UINT idFrames) {
 	VDTime ms;
 	BOOL ok;
 
-	if (!mpVideo)
-		return;
-
 	frames = GetDlgItemInt(mhdlg, idFrames, &ok, FALSE);
 	if (!ok) return;
 	mbReentry = true;
-	ms = mpVideo->samplesToMs(frames);
+
+	ms = VDRoundToInt64((double)frames * mFrameRate.AsInverseDouble() * 1000.0);
 	SetDlgItemInt(mhdlg, idMS, (UINT)ms, FALSE);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_MS,
-				(UINT)(mpVideo->samplesToMs(mpVideo->getLength())
+				(UINT)(mTotalTimeMS
 				-GetDlgItemInt(mhdlg, IDC_END_MS, NULL, FALSE)
 				-GetDlgItemInt(mhdlg, IDC_START_MS, NULL, FALSE)), TRUE);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_FRAMES,
-				(UINT)(mpVideo->getLength()
+				(UINT)(mFrameCount
 				-GetDlgItemInt(mhdlg, IDC_END_FRAMES, NULL, FALSE)
 				-GetDlgItemInt(mhdlg, IDC_START_FRAMES, NULL, FALSE)), TRUE);
 	mbReentry = false;
@@ -1066,19 +1108,18 @@ void VDDialogVideoRangeW32::LengthFrames() {
 	VDTime ms;
 	BOOL ok;
 
-	if (!mpVideo) return;
-
 	frames = GetDlgItemInt(mhdlg, IDC_LENGTH_FRAMES, &ok, TRUE);
 	if (!ok) return;
 	mbReentry = true;
-	ms = mpVideo->samplesToMs(frames);
+
+	ms = VDRoundToInt64((double)frames * mFrameRate.AsInverseDouble() * 1000.0);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_MS, (UINT)ms, FALSE);
 	SetDlgItemInt(mhdlg, IDC_END_MS,
-				(UINT)(mpVideo->samplesToMs(mpVideo->getLength())
+				(UINT)(mTotalTimeMS
 				-ms
 				-GetDlgItemInt(mhdlg, IDC_START_MS, NULL, TRUE)), TRUE);
 	SetDlgItemInt(mhdlg, IDC_END_FRAMES,
-				(UINT)(mpVideo->getLength()
+				(UINT)(mFrameCount
 				-frames
 				-GetDlgItemInt(mhdlg, IDC_START_FRAMES, NULL, TRUE)), TRUE);
 	mbReentry = false;
@@ -1089,19 +1130,18 @@ void VDDialogVideoRangeW32::LengthMS() {
 	VDTime ms;
 	BOOL ok;
 
-	if (!mpVideo) return;
-
 	ms = GetDlgItemInt(mhdlg, IDC_LENGTH_MS, &ok, TRUE);
 	if (!ok) return;
 	mbReentry = TRUE;
-	frames = mpVideo->msToSamples(ms);
+
+	frames = VDRoundToInt64((double)ms * mFrameRate.asDouble() / 1000.0);
 	SetDlgItemInt(mhdlg, IDC_LENGTH_FRAMES, (UINT)frames, FALSE);
 	SetDlgItemInt(mhdlg, IDC_END_MS,
-				(UINT)(mpVideo->samplesToMs(mpVideo->getLength())
+				(UINT)(mTotalTimeMS
 				-ms
 				-GetDlgItemInt(mhdlg, IDC_START_MS, NULL, TRUE)), TRUE);
 	SetDlgItemInt(mhdlg, IDC_END_FRAMES,
-				(UINT)(mpVideo->getLength()
+				(UINT)(mFrameCount
 				-frames
 				-GetDlgItemInt(mhdlg, IDC_START_FRAMES, NULL, TRUE)), TRUE);
 	mbReentry = FALSE;
@@ -1110,12 +1150,8 @@ void VDDialogVideoRangeW32::LengthMS() {
 INT_PTR VDDialogVideoRangeW32::DlgProc(UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
         case WM_INITDIALOG:
-			EnableWindow(GetDlgItem(mhdlg, IDC_LENGTH_MS), !!mpVideo);
-			EnableWindow(GetDlgItem(mhdlg, IDC_START_FRAMES), !!mpVideo);
-			EnableWindow(GetDlgItem(mhdlg, IDC_LENGTH_FRAMES), !!mpVideo);
-			EnableWindow(GetDlgItem(mhdlg, IDC_END_FRAMES), !!mpVideo);
-			SetDlgItemInt(mhdlg, IDC_START_MS, mOpts.video.lStartOffsetMS, FALSE);
-			SetDlgItemInt(mhdlg, IDC_END_MS, mOpts.video.lEndOffsetMS, FALSE);
+			SetDlgItemInt(mhdlg, IDC_START_MS, VDClampToUint32(mOpts.video.mSelectionStart.ResolveToMS(mFrameCount, mFrameRate, false)), FALSE);
+			SetDlgItemInt(mhdlg, IDC_END_MS, VDClampToUint32(mOpts.video.mSelectionEnd.ResolveToMS(mFrameCount, mFrameRate, true)), FALSE);
 			CheckDlgButton(mhdlg, IDC_OFFSET_AUDIO, mOpts.audio.fStartAudio);
 			CheckDlgButton(mhdlg, IDC_CLIP_AUDIO, mOpts.audio.fEndAudio);
             return (TRUE);
@@ -1156,8 +1192,8 @@ INT_PTR VDDialogVideoRangeW32::DlgProc(UINT message, WPARAM wParam, LPARAM lPara
 					LengthFrames();
 				break;
 			case IDOK:
-				mOpts.video.lStartOffsetMS	= GetDlgItemInt(mhdlg, IDC_START_MS, NULL, FALSE);
-				mOpts.video.lEndOffsetMS	= GetDlgItemInt(mhdlg, IDC_END_MS, NULL, FALSE);
+				mSelStart = GetDlgItemInt(mhdlg, IDC_START_FRAMES, NULL, FALSE);
+				mSelEnd = mFrameCount - GetDlgItemInt(mhdlg, IDC_END_FRAMES, NULL, FALSE);
 				mOpts.audio.fStartAudio		= !!IsDlgButtonChecked(mhdlg, IDC_OFFSET_AUDIO);
 				mOpts.audio.fEndAudio		= !!IsDlgButtonChecked(mhdlg, IDC_CLIP_AUDIO);
 				End(true);
@@ -1171,8 +1207,8 @@ INT_PTR VDDialogVideoRangeW32::DlgProc(UINT message, WPARAM wParam, LPARAM lPara
     return FALSE;
 }
 
-bool VDDisplayVideoRangeDialog(VDGUIHandle hParent, DubOptions& opts, VideoSource *pVS) {
-	VDDialogVideoRangeW32 dlg(opts, pVS);
+bool VDDisplayVideoRangeDialog(VDGUIHandle hParent, DubOptions& opts, const VDFraction& frameRate, VDPosition frameCount, VDPosition& startSel, VDPosition& endSel) {
+	VDDialogVideoRangeW32 dlg(opts, frameRate, frameCount, startSel, endSel);
 
 	return dlg.Activate(hParent);
 }
@@ -1300,7 +1336,7 @@ bool VDDisplayAudioVolumeDialog(VDGUIHandle hParent, DubOptions& opts) {
 
 class VDDialogJumpToPositionW32 : public VDDialogBaseW32 {
 public:
-	inline VDDialogJumpToPositionW32(VDPosition currentFrame, VideoSource *pVS, const VDFraction& realRate) : VDDialogBaseW32(IDD_JUMPTOFRAME), mFrame(currentFrame), mpVideo(pVS), mRealRate(realRate) {}
+	inline VDDialogJumpToPositionW32(VDPosition currentFrame, IVDVideoSource *pVS, const VDFraction& realRate) : VDDialogBaseW32(IDD_JUMPTOFRAME), mFrame(currentFrame), mpVideo(pVS), mRealRate(realRate) {}
 
 	VDPosition Activate(VDGUIHandle hParent) { return ActivateDialog(hParent) ? mFrame : -1; }
 
@@ -1309,7 +1345,7 @@ protected:
 	void ReinitDialog();
 
 	VDPosition mFrame;
-	VideoSource *const mpVideo;
+	IVDVideoSource *const mpVideo;
 	VDFraction	mRealRate;
 };
 
@@ -1365,7 +1401,7 @@ INT_PTR VDDialogJumpToPositionW32::DlgProc(UINT msg, WPARAM wParam, LPARAM lPara
 					return TRUE;
 				}
 
-				mFrame = VDRoundToInt64((double)mRealRate * (sec + min*60 + hr*3600));
+				mFrame = VDRoundToInt64(mRealRate.asDouble() * (sec + min*60 + hr*3600));
 
 				End(true);
 			}
@@ -1389,7 +1425,7 @@ INT_PTR VDDialogJumpToPositionW32::DlgProc(UINT msg, WPARAM wParam, LPARAM lPara
 }
 
 void VDDialogJumpToPositionW32::ReinitDialog() {
-	long ticks = VDRoundToLong(mFrame * 1000.0 / (double)mRealRate);
+	long ticks = VDRoundToLong(mFrame * 1000.0 / mRealRate.asDouble());
 	long ms, sec, min;
 	char buf[64];
 
@@ -1411,7 +1447,7 @@ void VDDialogJumpToPositionW32::ReinitDialog() {
 	SetDlgItemText(mhdlg, IDC_FRAMETIME, buf);
 }
 
-VDPosition VDDisplayJumpToPositionDialog(VDGUIHandle hParent, VDPosition currentFrame, VideoSource *pVS, const VDFraction& realRate) {
+VDPosition VDDisplayJumpToPositionDialog(VDGUIHandle hParent, VDPosition currentFrame, IVDVideoSource *pVS, const VDFraction& realRate) {
 	VDDialogJumpToPositionW32 dlg(currentFrame, pVS, realRate);
 
 	return dlg.Activate(hParent);
@@ -1425,7 +1461,7 @@ VDPosition VDDisplayJumpToPositionDialog(VDGUIHandle hParent, VDPosition current
 
 class VDDialogErrorModeW32 : public VDDialogBaseW32 {
 public:
-	inline VDDialogErrorModeW32(const char *pszSettingsKey, DubSource *pSource) : VDDialogBaseW32(IDD_ERRORMODE), mpszSettingsKey(pszSettingsKey), mpSource(pSource) {}
+	inline VDDialogErrorModeW32(const char *pszSettingsKey, IVDStreamSource *pSource) : VDDialogBaseW32(IDD_ERRORMODE), mpszSettingsKey(pszSettingsKey), mpSource(pSource) {}
 
 	DubSource::ErrorMode Activate(VDGUIHandle hParent, DubSource::ErrorMode oldMode);
 
@@ -1436,8 +1472,8 @@ protected:
 	void ReinitDialog();
 
 	const char *const mpszSettingsKey;
-	DubSource::ErrorMode	mErrorMode;
-	DubSource *const mpSource;
+	IVDStreamSource::ErrorMode	mErrorMode;
+	IVDStreamSource *const mpSource;
 };
 
 DubSource::ErrorMode VDDialogErrorModeW32::Activate(VDGUIHandle hParent, DubSource::ErrorMode oldMode) {
@@ -1495,7 +1531,7 @@ void VDDialogErrorModeW32::ComputeMode() {
 		mErrorMode = DubSource::kErrorModeDecodeAnyway;
 }
 
-DubSource::ErrorMode VDDisplayErrorModeDialog(VDGUIHandle hParent, DubSource::ErrorMode oldMode, const char *pszSettingsKey, DubSource *pSource) {
+DubSource::ErrorMode VDDisplayErrorModeDialog(VDGUIHandle hParent, IVDStreamSource::ErrorMode oldMode, const char *pszSettingsKey, IVDStreamSource *pSource) {
 	VDDialogErrorModeW32 dlg(pszSettingsKey, pSource);
 
 	return dlg.Activate(hParent, oldMode);
@@ -1910,6 +1946,11 @@ LRESULT VDDialogFileTextInfoW32::LVWndProc(HWND hwnd, UINT msg, WPARAM wParam, L
 			EndEdit(true);
 		}
 		return 0;
+
+	case WM_VSCROLL:
+	case WM_MOUSEWHEEL:
+		EndEdit(true);
+		break;
 	}
 	return VDDualCallWindowProcW32(mOldLVProc, hwnd, msg, wParam, lParam);
 }

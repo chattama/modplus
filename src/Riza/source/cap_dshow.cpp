@@ -21,13 +21,16 @@
 #define NO_DSHOW_STRSAFE
 #include <vd2/Riza/capdriver.h>
 #include <vd2/Riza/cap_dshow.h>
+#include <vd2/system/profile.h>
 #include <vd2/system/vdstring.h>
 #include <vd2/system/time.h>
 #include <vd2/system/fraction.h>
 #include <vd2/system/error.h>
 #include <vd2/system/math.h>
 #include <vd2/system/log.h>
+#include <vd2/system/refcount.h>
 #include <vd2/system/registry.h>
+#include <vd2/system/thread.h>
 #include <objbase.h>
 #include <dshow.h>
 #include <windows.h>
@@ -63,64 +66,6 @@ extern HINSTANCE g_hInst;
 	#define DS_VERBOSE_LOG(msg) ((void)0)
 	#define DS_VERBOSE_LOGF(...) ((void)0)
 #endif
-
-///////////////////////////////////////////////////////////////////////////
-//
-//	fast semaphore
-//
-///////////////////////////////////////////////////////////////////////////
-
-namespace {
-	class VDFastSemaphore {
-	public:
-		VDFastSemaphore(int initial);
-		~VDFastSemaphore();
-
-		void Wait() {
-			if (mValue.postdec() <= 0)
-				SlowWait();
-		}
-
-		bool TryWait() {
-			if (mValue.postinc() < 0) {
-				++mValue;
-				return false;
-			}
-
-			return true;
-		}
-
-		void Post() {
-			if (mValue.postinc() < 0)
-				SlowPost();
-		}
-
-	private:
-		void SlowWait();
-		void SlowPost();
-
-		VDAtomicInt mValue;
-		HANDLE mKernelSema;
-	};
-
-	VDFastSemaphore::VDFastSemaphore(int initial)
-		: mValue(initial)
-		, mKernelSema(CreateSemaphore(NULL, 1, 1, NULL))
-	{
-	}
-
-	VDFastSemaphore::~VDFastSemaphore()
-	{
-	}
-
-	void VDFastSemaphore::SlowWait() {
-		WaitForSingleObject(mKernelSema, INFINITE);
-	}
-
-	void VDFastSemaphore::SlowPost() {
-		ReleaseSemaphore(mKernelSema, 1, NULL);
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////
 //
@@ -976,10 +921,28 @@ protected:
 
 	VDAtomicInt mRefCount;
 	IVDCaptureDSCallback *mpCallback;
+	VDAtomicInt mBlockSamples;
+	bool mIgnoreTimestamps;
+	uint32 mTimeBase;
 
 public:
 
-	VDCapDevDSCallback(IVDCaptureDSCallback *pCB) : mRefCount(1), mpCallback(pCB) {
+	VDCapDevDSCallback(IVDCaptureDSCallback *pCB)
+		: mRefCount(1)
+		, mpCallback(pCB)
+		, mBlockSamples(true)
+		, mIgnoreTimestamps(false)
+		, mTimeBase(0)
+	{
+	}
+
+	void SetBlockSamples(bool block) {
+		mBlockSamples = block;
+	}
+
+	void SetIgnoreTimestamps(bool enabled, uint32 timeBase) {
+		mIgnoreTimestamps = enabled;
+		mTimeBase = timeBase;
 	}
 
 	// IUnknown
@@ -1024,6 +987,7 @@ public:
 	VDCapDevDSVideoCallback(IVDCaptureDSCallback *pCB)
 		: VDCapDevDSCallback(pCB)
 		, mChannel(0)
+		, mVCallback("DSVideo")
 	{
 	}
 
@@ -1035,25 +999,37 @@ public:
 		BYTE *pData;
 		HRESULT hr;
 
+		if (mBlockSamples)
+			return S_OK;
+
+		mVCallback.Begin(0xe0e0e0, "VC");
 		if (mpCallback->CapTryEnterCriticalSection()) {
 			// retrieve sample pointer
 			hr = pSample->GetPointer(&pData);
-			if (FAILED(hr))
+			if (FAILED(hr)) {
+				mpCallback->CapLeaveCriticalSection();
+				mVCallback.End();
 				return hr;
+			}
 
 			// retrieve times
 			__int64 t1, t2;
-			hr = pSample->GetTime(&t1, &t2);
-			if (FAILED(hr))
-				t1 = t2 = -1;
-			else
-				t1 = (t1+5)/10;
+			if (mIgnoreTimestamps) {
+				t1 = (VDGetAccurateTick() - mTimeBase) * 1000;
+			} else {
+				hr = pSample->GetTime(&t1, &t2);
+				if (FAILED(hr))
+					t1 = t2 = -1;
+				else
+					t1 = (t1+5)/10;
+			}
 
 			mpCallback->CapProcessData(mChannel, pData, pSample->GetActualDataLength(), t1, S_OK == pSample->IsSyncPoint());
 			++mFrameCount;
 
 			mpCallback->CapLeaveCriticalSection();
 		}
+		mVCallback.End();
 
 		return S_OK;
 	}
@@ -1061,6 +1037,7 @@ public:
 protected:
 	int mChannel;
 	VDAtomicInt	mFrameCount;
+	VDRTProfileChannel mVCallback;
 };
 
 class VDCapDevDSAudioCallback : public VDCapDevDSCallback {
@@ -1068,6 +1045,7 @@ public:
 	VDCapDevDSAudioCallback(IVDCaptureDSCallback *pCB)
 		: VDCapDevDSCallback(pCB)
 		, mChannel(1)
+		, mACallback("DSAudio")
 	{
 	}
 
@@ -1077,14 +1055,21 @@ public:
 		BYTE *pData;
 		HRESULT hr;
 
+		if (mBlockSamples)
+			return S_OK;
+
+		mACallback.Begin(0xe0e0e0, "AC");
 		if (mpCallback->CapTryEnterCriticalSection()) {
 			// retrieve sample pointer
 			hr = pSample->GetPointer(&pData);
-			if (FAILED(hr))
+			if (FAILED(hr)) {
+				mpCallback->CapLeaveCriticalSection();
+				mACallback.End();
 				return hr;
+			}
 
 			// Retrieve times. Note that if no clock is set, this will fail.
-			__int64 t1, t2;
+			REFERENCE_TIME t1, t2;
 			hr = pSample->GetTime(&t1, &t2);
 			if (FAILED(hr))
 				t1 = t2 = -1;
@@ -1094,12 +1079,14 @@ public:
 			mpCallback->CapProcessData(mChannel, pData, pSample->GetActualDataLength(), t1, S_OK == pSample->IsSyncPoint());
 			mpCallback->CapLeaveCriticalSection();
 		}
+		mACallback.End();
 
 		return S_OK;
 	}
 
 protected:
 	int mChannel;
+	VDRTProfileChannel mACallback;
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1205,6 +1192,9 @@ public:
 
 	bool	GetForceAudioRendererClock();
 	void	SetForceAudioRendererClock(bool enabled);
+
+	bool	GetIgnoreVideoTimestamps();
+	void	SetIgnoreVideoTimestamps(bool enabled);
 
 protected:
 	struct InputSource;
@@ -1319,7 +1309,7 @@ protected:
 	// Callbacks
 	VDCapDevDSVideoCallback		mVideoCallback;
 	VDCapDevDSAudioCallback		mAudioCallback;
-	VDFastSemaphore				mGraphStateLock;
+	VDSemaphore					mGraphStateLock;
 
 	// Misc flags & state
 	DWORD mdwRegisterGraph;				// Used to register filter graph in ROT for graphedit
@@ -1339,6 +1329,7 @@ protected:
 	bool mbDisplayVisible;
 	bool mbForceAudioRendererClock;		// force the audio renderer to be the clock when present
 	bool mbDisableClockForPreview;		// disable the clock by default
+	bool mbIgnoreVideoTimestamps;
 
 	// state tracking for reporting changes
 	sint32		mTrackedFramePeriod;
@@ -1346,7 +1337,7 @@ protected:
 
 	vdstructex<WAVEFORMATEX>	mAudioFormat;
 
-	VDTime	mCaptureStart;
+	uint32	mCaptureStart;
 
 	VDAtomicInt	mCaptureStopQueued;
 
@@ -1372,7 +1363,7 @@ VDCaptureDriverDS::VDCaptureDriverDS(IMoniker *pVideoDevice)
 	, mpVideoCrossbar(NULL)
 	, mVideoCallback(this)
 	, mAudioCallback(this)
-	, mGraphStateLock(1)
+	, mGraphStateLock(2)
 	, mhwndParent(NULL)
 	, mhwndEventSink(NULL)
 	, mDisplayRect(0,0,0,0)
@@ -1648,6 +1639,10 @@ bool VDCaptureDriverDS::Init(VDGUIHandle hParent) {
 	}
 
 	Enumerate(mAudioDevices, CLSID_AudioInputDeviceCategory);
+
+#if 0	// Disabled Dazzle hack for now.
+	Enumerate(mAudioDevices, KSCATEGORY_CAPTURE);
+#endif
 
 	// Select the first audio device if there is one.
 	mAudioDeviceIndex = -1;
@@ -3005,6 +3000,7 @@ bool VDCaptureDriverDS::CaptureStart() {
 			if (!mpCB || mpCB->CapEvent(kEventPreroll, 0)) {
 				// reset capture start time in case there was a preroll dialog
 				mCaptureStart = VDGetAccurateTick();
+				mVideoCallback.SetIgnoreTimestamps(mbIgnoreVideoTimestamps, mCaptureStart);
 
 				bool success = false;
 				if (mpCB) {
@@ -3031,7 +3027,9 @@ bool VDCaptureDriverDS::CaptureStart() {
 			}
 		}
 
+		mGraphStateLock.Wait();		// 2x because of audio/video
 		mGraphStateLock.Wait();
+
 		hr = mpGraphControl->Stop();		// Have to do this because our graph state flag doesn't track PAUSED. Okay to fail.
 		if (hr == S_FALSE) {
 			OAFilterState state;
@@ -3048,6 +3046,7 @@ bool VDCaptureDriverDS::CaptureStart() {
 		if (FAILED(hr))
 			VDLog(kVDLogWarning, VDStringW(L"CapDShow: Unable to stop filter graph.\n"));
 
+		mGraphStateLock.Post();		// 2x because of audio/video
 		mGraphStateLock.Post();
 
 		if (mpCB)
@@ -3125,6 +3124,14 @@ void VDCaptureDriverDS::SetForceAudioRendererClock(bool enabled) {
 	mbForceAudioRendererClock = enabled;
 }
 
+bool VDCaptureDriverDS::GetIgnoreVideoTimestamps() {
+	return mbIgnoreVideoTimestamps;
+}
+
+void VDCaptureDriverDS::SetIgnoreVideoTimestamps(bool enabled) {
+	mbIgnoreVideoTimestamps = enabled;
+}
+
 void VDCaptureDriverDS::UpdateDisplay() {
 	if (mUpdateLocks)
 		mbUpdatePending = true;
@@ -3146,11 +3153,15 @@ bool VDCaptureDriverDS::StopGraph() {
 	mbGraphActive = false;
 	mbStartPending = false;
 
+	mVideoCallback.SetBlockSamples(true);
+	mAudioCallback.SetBlockSamples(true);
+
 #ifdef _DEBUG
 	uint32 startTime = VDGetAccurateTick();
 	VDDEBUG("Riza/CapDShow: Filter graph stopping...\n");
 #endif
 
+	mGraphStateLock.Wait();		// 2x because of audio/video
 	mGraphStateLock.Wait();
 
 	HRESULT hr = mpGraphControl->Stop();
@@ -3170,6 +3181,7 @@ bool VDCaptureDriverDS::StopGraph() {
 	if (FAILED(hr))
 		VDLog(kVDLogWarning, VDStringW(L"CapDShow: Unable to stop filter graph.\n"));
 
+	mGraphStateLock.Post();		// 2x because of audio/video
 	mGraphStateLock.Post();
 
 #ifdef _DEBUG
@@ -3192,6 +3204,9 @@ bool VDCaptureDriverDS::StartGraph() {
 
 	mbStartPending = false;
 
+	mVideoCallback.SetBlockSamples(false);
+	mAudioCallback.SetBlockSamples(false);
+
 	mbGraphActive = false;
 	HRESULT hr = mpGraphControl->Run();
 
@@ -3210,6 +3225,9 @@ bool VDCaptureDriverDS::StartGraph() {
 	if (FAILED(hr)) {
 		const char *err = GetDXErrorName(hr);
 		VDLog(kVDLogWarning, VDswprintf(L"CapDShow: Unable to transition filter graph to run state: hr = %08x (%hs)\n", 2, &hr, &err));
+
+		mVideoCallback.SetBlockSamples(true);
+		mAudioCallback.SetBlockSamples(true);
 	} else {
 		mbGraphActive = true;
 	}

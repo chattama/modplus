@@ -18,17 +18,18 @@
 #ifndef f_DUB_H
 #define f_DUB_H
 
-#include <windows.h>
-#include <vector>
+#ifdef _MSC_VER
+	#pragma once
+#endif
 
 #include <vd2/system/error.h>
 #include <vd2/system/vdalloc.h>
 #include <vd2/system/VDString.h>
 #include <vd2/system/fraction.h>
+#include <vd2/system/event.h>
+#include <vd2/Riza/videocodec.h>
 #include "audio.h"
-#include "filters.h"
 #include "fixes.h"
-#include "AVIStripeSystem.h"
 
 class AsyncBlitter;
 class AVIPipe;
@@ -42,6 +43,7 @@ class InputFile;
 class IDubStatusHandler;
 class IVDDubberOutputSystem;
 struct VDAudioFilterGraph;
+class FilterSystem;
 
 ////////////////////////
 
@@ -76,6 +78,14 @@ public:
 	char mode;
 };
 
+class DubVideoPosition {
+public:
+	VDPosition	mOffset;		// in frames from start; -1 means end
+
+	VDPosition ResolveToFrames(VDPosition frameCount) const;
+	VDPosition ResolveToMS(VDPosition frameCount, const VDFraction& resultTimeBase, bool fromEnd) const;
+};
+
 class DubVideoOptions {
 public:
 	enum {
@@ -90,11 +100,22 @@ public:
 		kFrameRateAdjustSameLength = 1
 	};
 
+	enum PreviewFieldMode {
+		kPreviewFieldsProgressive,
+		kPreviewFieldsWeaveTFF,
+		kPreviewFieldsWeaveBFF,
+		kPreviewFieldsBobTFF,
+		kPreviewFieldsBobBFF,
+		kPreviewFieldsNonIntTFF,
+		kPreviewFieldsNonIntBFF
+	};
+	
 	int		mInputFormat;
 	int		mOutputFormat;
 	char	mode;
 	bool	mbUseSmartRendering;
 	bool	mbPreserveEmptyFrames;
+	int		mMaxVideoCompressionThreads;
 	bool	fShowInputFrame, fShowOutputFrame, fShowDecompressedFrame;
 	bool	fSyncToAudio;
 	int		frameRateDecimation;
@@ -103,15 +124,10 @@ public:
 	uint32	mFrameRateAdjustHi;
 	uint32	mFrameRateAdjustLo;
 
-	long	lStartOffsetMS;
-	long	lEndOffsetMS;
+	DubVideoPosition mSelectionStart;
+	DubVideoPosition mSelectionEnd;
 
-	bool	fInvTelecine;
-	bool	fIVTCMode;
-	int		nIVTCOffset;
-	bool	fIVTCPolarity;
-
-	int		nPreviewFieldMode;
+	PreviewFieldMode	previewFieldMode;
 };
 
 class DubPerfOptions {
@@ -162,33 +178,52 @@ public:
 	sint64	cur_dst;			// current render map index for fetch
 	sint64	end_dst;			// total number of timeline frames to fetch
 
-	VDFraction	frameRate;
-	VDFraction	frameRateIn;
-	VDFraction	frameRateNoTelecine;
-	long	usPerFrame;
-	long	usPerFrameIn;
-	long	usPerFrameNoTelecine;
+	// Frame rate cascade:
+	//
+	//	video source
+	//	frame rate adjust		=> frameRateIn
+	//	IVTC					=> frameRatePreFilter
+	//	filters					=> frameRatePostFilter, frameRateTimeline
+	//	conversion				=> frameRate
+
+	VDFraction	mFrameRateIn;
+	VDFraction	mFrameRatePreFilter;
+	VDFraction	mFrameRatePostFilter;
+	VDFraction	mFrameRateTimeline;
+	VDFraction	mFrameRate;
+	VDFraction	mFrameRateIVTCFactor;
 	long	processed;
 	uint32	lastProcessedTimestamp;
 	bool	fAudioOnly;
+};
+
+struct VDDubPerfStatus {
+	uint32	mVideoBuffersActive;
+	uint32	mVideoBuffersTotal;
+	uint32	mVideoRequestsActive;
+	uint32	mAudioBufferInUse;
+	uint32	mAudioBufferTotal;
+	float	mIOActivityRatio;
+	float	mProcActivityRatio;
 };
 
 class IDubber {
 public:
 	virtual ~IDubber()					=0;
 
-	virtual void SetAudioCompression(const WAVEFORMATEX *wf, uint32 cb, const char *pShortNameHint) = 0;
+	virtual void SetAudioCompression(const VDWaveFormat *wf, uint32 cb, const char *pShortNameHint) = 0;
 	virtual void SetPhantomVideoMode()=0;
 	virtual void SetInputDisplay(IVDVideoDisplay *pDisplay) = 0;
 	virtual void SetOutputDisplay(IVDVideoDisplay *pDisplay) = 0;
 	virtual void SetAudioFilterGraph(const VDAudioFilterGraph& graph)=0;
-	virtual void Init(IVDVideoSource *const *pVideoSources, uint32 nVideoSources, AudioSource *const *pAudioSources, uint32 nAudioSources, IVDDubberOutputSystem *out, COMPVARS *videoCompVars, const FrameSubset *pfs) = 0;
+	virtual void Init(IVDVideoSource *const *pVideoSources, uint32 nVideoSources, AudioSource *const *pAudioSources, uint32 nAudioSources, IVDDubberOutputSystem *out, void *videoCompVars, const FrameSubset *pfs, const VDFraction& frameRateTimeline) = 0;
 	virtual void Go(int iPriority = 0) = 0;
 	virtual void Stop() = 0;
 
-	virtual void Abort()			=0;
+	virtual void Abort(bool userAbort = true)	=0;
 	virtual bool isRunning()		=0;
 	virtual bool isAbortedByUser()	=0;
+	virtual bool IsAborted()		=0;
 	virtual bool IsPreviewing()		=0;
 
 	virtual void SetStatusHandler(IDubStatusHandler *pdsh)		=0;
@@ -196,10 +231,22 @@ public:
 	virtual void UpdateFrames()=0;
 
 	virtual void SetThrottleFactor(float throttleFactor) = 0;
+
+	virtual void GetPerfStatus(VDDubPerfStatus& status) = 0;
+
+	virtual VDEvent<IDubber, bool>& Stopped() = 0;
+};
+
+class IDubberInternal {
+public:
+	virtual void InternalSignalStop()	= 0;
 };
 
 IDubber *CreateDubber(DubOptions *xopt);
-void InitStreamValuesStatic(DubVideoStreamInfo& vInfo, DubAudioStreamInfo& aInfo, IVDVideoSource *video, AudioSource *audio, DubOptions *opt, const FrameSubset *pfs=NULL);
+void VDConvertSelectionTimesToFrames(const DubOptions& opt, const FrameSubset& subset, const VDFraction& subsetRate, VDPosition& startFrame, VDPosition& endFrame);
+void InitVideoStreamValuesStatic(DubVideoStreamInfo& vInfo, IVDVideoSource *video, AudioSource *audio, const DubOptions *opt, const FrameSubset *pfs, const VDPosition *pSelectionStartFrame, const VDPosition *pSelectionEndFrame);
+void InitVideoStreamValuesStatic2(DubVideoStreamInfo& vInfo, const DubOptions *opt, const FilterSystem *filtsys, const VDFraction& frameRateTimeline);
+void InitAudioStreamValuesStatic(DubAudioStreamInfo& aInfo, AudioSource *audio, const DubOptions *opt);
 
 #ifndef f_DUB_CPP
 

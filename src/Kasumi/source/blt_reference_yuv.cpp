@@ -7,6 +7,10 @@
 
 #include "blt_spanutils.h"
 
+#ifdef _M_IX86
+	#include "blt_spanutils_x86.h"
+#endif
+
 using namespace nsVDPixmapSpanUtils;
 
 namespace {
@@ -944,7 +948,12 @@ void VDPixmapBlt_YUVPlanar_decode_reference(const VDPixmap& dst, const VDPixmap&
 		hbits = 1;
 
 	bool h_coaligned = true;
-	bool v_coaligned = true;
+	bool v_coaligned = false;
+
+	if (src.format == nsVDPixmap::kPixFormat_YUV422_Planar_Centered ||
+		src.format == nsVDPixmap::kPixFormat_YUV420_Planar_Centered) {
+		h_coaligned = false;
+	}
 
 	tpYUVPlanarVertDecoder vfunc = NULL;
 	tpYUVPlanarHorizDecoder hfunc = NULL;
@@ -959,14 +968,14 @@ void VDPixmapBlt_YUVPlanar_decode_reference(const VDPixmap& dst, const VDPixmap&
 	case 0:		// 4:4:4, 4:2:2
 	case 1:
 		break;
-	case 3:		// 4:2:0 (centered) 
+	case 2:		// 4:2:0 (centered) 
 		vfunc = vert_expand2x_centered;
 		vert_buffer_size = w>>1;
 		yaccum = 6;
 		yinc = 4;
 		yleft >>= 1;
 		break;
-	case 5:		// 4:1:0 (centered)
+	case 4:		// 4:1:0 (centered)
 		vfunc = vert_expand4x_centered;
 		vert_buffer_size = w>>2;
 		yaccum = 5;
@@ -986,6 +995,11 @@ void VDPixmapBlt_YUVPlanar_decode_reference(const VDPixmap& dst, const VDPixmap&
 	uint32 cpuflags = CPUGetEnabledExtensions();
 
 	if (cpuflags & CPUF_SUPPORTS_MMX) {
+		if (cpuflags & CPUF_SUPPORTS_INTEGER_SSE) {
+			if (vfunc == vert_expand2x_centered)
+				vfunc = vert_expand2x_centered_ISSE;
+		}
+
 		switch(dst.format) {
 		case nsVDPixmap::kPixFormat_XRGB1555:	dfunc = vdasm_pixblt_YUV444Planar_to_XRGB1555_scan_MMX;	break;
 		case nsVDPixmap::kPixFormat_RGB565:		dfunc = vdasm_pixblt_YUV444Planar_to_RGB565_scan_MMX;	break;
@@ -1020,7 +1034,11 @@ void VDPixmapBlt_YUVPlanar_decode_reference(const VDPixmap& dst, const VDPixmap&
 		}
 		break;
 	case 2:		// 4:2:0 MPEG-1 (centered)
-		if (!halfchroma) {
+		if (halfchroma) {
+			hfunc = horiz_realign_to_coaligned;
+			horiz_buffer_size = (w + 1) >> 1;
+			horiz_count = (w + 1) >> 1;
+		} else {
 			hfunc = horiz_expand2x_centered;
 			horiz_buffer_size = w;
 			horiz_count = w;
@@ -1049,6 +1067,13 @@ void VDPixmapBlt_YUVPlanar_decode_reference(const VDPixmap& dst, const VDPixmap&
 		VDNEVERHERE;
 		return;
 	}
+
+#ifdef _M_IX86
+	if (cpuflags & CPUF_SUPPORTS_INTEGER_SSE) {
+		if (hfunc == horiz_expand2x_coaligned)
+			hfunc = horiz_expand2x_coaligned_ISSE;
+	}
+#endif
 
 	uint32 chroma_srcwidth = -(-w >> srcinfo.auxwbits);
 	horiz_buffer_size = (horiz_buffer_size + 15) & ~15;
@@ -1169,6 +1194,15 @@ namespace {
 			return;
 		}
 
+#ifdef _M_IX86
+		uint32 cpuflags = CPUGetEnabledExtensions();
+
+		if (cpuflags & CPUF_SUPPORTS_INTEGER_SSE) {
+			if (hfunc == horiz_expand2x_coaligned)
+				hfunc = horiz_expand2x_coaligned_ISSE;
+		}
+#endif
+
 		int winsize, winposnext, winstep;
 
 		switch(yshift) {
@@ -1206,6 +1240,13 @@ namespace {
 			return;
 		}
 
+#ifdef _M_IX86
+		if (cpuflags & CPUF_SUPPORTS_INTEGER_SSE) {
+			if (vfunc == vert_expand2x_centered)
+				vfunc = vert_expand2x_centered_ISSE;
+		}
+#endif
+
 		int dsth = -(-h >> dstinfo.auxhbits);
 		int srch = -(-h >> srcinfo.auxhbits);
 		int dstw = -(-w >> dstinfo.auxwbits);
@@ -1239,11 +1280,19 @@ namespace {
 
 			if (vfunc)
 				vfunc(dst, window + (winpos & (winsize-1)), dstw, winposnext & 255);
+			else if (!hfunc)
+				memcpy(dst, window[winpos & (winsize-1)], dstw);
 
 			winposnext += winstep;
 			vdptrstep(dst, dstpitch);
 		} while(--dsth);
-	 }
+
+#ifdef _M_IX86
+		if (cpuflags & CPUF_SUPPORTS_MMX) {
+			__asm emms
+		}
+#endif
+	}
 }
 
 void VDPixmapBlt_YUVPlanar_convert_reference(const VDPixmap& dstpm, const VDPixmap& srcpm, vdpixsize w, vdpixsize h) {

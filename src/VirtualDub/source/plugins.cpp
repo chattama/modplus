@@ -15,7 +15,7 @@
 #include "plugins.h"
 #include "misc.h"
 
-extern FilterFunctions g_filterFuncs;
+extern VDXFilterFunctions g_VDFilterCallbacks;
 
 namespace {
 	class VDShadowedPluginDescription : public VDPluginDescription, public vdrefcounted<IVDRefCount> {
@@ -39,21 +39,6 @@ namespace {
 		VDPluginInfo			mShadowedInfo;
 	};
 
-	class VDShadowedVideoFilterDescription : public VDShadowedPluginDescription {
-	public:
-		virtual void Init(const VDPluginInfo *pInfo, VDExternalModule *pModule) {
-			VDShadowedPluginDescription::Init(pInfo, pModule);
-
-			const VDVideoFilterDefinition *def = static_cast<const VDVideoFilterDefinition *>(pInfo->mpTypeSpecificInfo);
-			memset(&mDefinition, 0, sizeof mDefinition);
-			memcpy(&mDefinition, def, std::min<uint32>(def->mSize, sizeof mDefinition));
-			mDefinition.mpConfigInfo = NULL;
-			mShadowedInfo.mpTypeSpecificInfo = &mDefinition;
-		}
-
-		VDVideoFilterDefinition	mDefinition;
-	};
-
 	class VDShadowedAudioFilterDescription : public VDShadowedPluginDescription {
 	public:
 		virtual void Init(const VDPluginInfo *pInfo, VDExternalModule *pModule) {
@@ -75,7 +60,7 @@ namespace {
 		virtual void Init(const VDPluginInfo *pInfo, VDExternalModule *pModule) {
 			VDShadowedPluginDescription::Init(pInfo, pModule);
 
-			const VDInputDriverDefinition *def = static_cast<const VDInputDriverDefinition *>(pInfo->mpTypeSpecificInfo);
+			const VDXInputDriverDefinition *def = static_cast<const VDXInputDriverDefinition *>(pInfo->mpTypeSpecificInfo);
 			memset(&mDefinition, 0, sizeof mDefinition);
 			memcpy(&mDefinition, def, std::min<uint32>(def->mSize, sizeof mDefinition));
 			mShadowedInfo.mpTypeSpecificInfo = &mDefinition;
@@ -99,7 +84,7 @@ namespace {
 		}
 
 	protected:
-		VDInputDriverDefinition	mDefinition;
+		VDXInputDriverDefinition	mDefinition;
 
 		vdfastvector<uint8>		mSignature;
 		VDStringW				mFilenameDetectPattern;
@@ -130,15 +115,11 @@ void VDConnectPluginDescription(const VDPluginInfo *pInfo, VDExternalModule *pMo
 
 	if (!pDesc) {
 		switch(pInfo->mType) {
-			case kVDPluginType_Video:
-				pDesc = new VDShadowedVideoFilterDescription;
-				break;
-
-			case kVDPluginType_Audio:
+			case kVDXPluginType_Audio:
 				pDesc = new VDShadowedAudioFilterDescription;
 				break;
 
-			case kVDPluginType_Input:
+			case kVDXPluginType_Input:
 				pDesc = new VDShadowedInputDriverDescription;
 				break;
 		}
@@ -231,7 +212,7 @@ void VDExternalModule::DisconnectOldPlugins() {
 	if (mModuleInfo.hInstModule) {
 		{
 			VDExternalCodeBracket bracket(mFilename.c_str(), __FILE__, __LINE__);
-			mModuleInfo.deinitProc(&mModuleInfo, &g_filterFuncs);
+			mModuleInfo.deinitProc(&mModuleInfo, &g_VDFilterCallbacks);
 		}
 
 		mModuleInfo.hInstModule = NULL;
@@ -242,21 +223,21 @@ void VDExternalModule::ReconnectOldPlugins() {
 	if (!mModuleInfo.hInstModule) {
 		VDStringA nameA(VDTextWToA(mFilename));
 
-		mModuleInfo.hInstModule = mhModule;
+		mModuleInfo.hInstModule = (VDXHINSTANCE)mhModule;
 
 		try {
-			mModuleInfo.initProc   = (FilterModuleInitProc  )GetProcAddress(mModuleInfo.hInstModule, "VirtualdubFilterModuleInit2");
-			mModuleInfo.deinitProc = (FilterModuleDeinitProc)GetProcAddress(mModuleInfo.hInstModule, "VirtualdubFilterModuleDeinit");
+			mModuleInfo.initProc   = (VDXFilterModuleInitProc  )GetProcAddress((HINSTANCE)mModuleInfo.hInstModule, "VirtualdubFilterModuleInit2");
+			mModuleInfo.deinitProc = (VDXFilterModuleDeinitProc)GetProcAddress((HINSTANCE)mModuleInfo.hInstModule, "VirtualdubFilterModuleDeinit");
 
 			if (!mModuleInfo.initProc) {
-				void *fp = GetProcAddress(mModuleInfo.hInstModule, "VirtualdubFilterModuleInit");
+				void *fp = GetProcAddress((HINSTANCE)mModuleInfo.hInstModule, "VirtualdubFilterModuleInit");
 
 				if (fp)
 					throw MyError(
 						"This filter was created for VirtualDub 1.1 or earlier, and is not compatible with version 1.2 or later. "
 						"Please contact the author for an updated version.");
 
-				if (GetProcAddress(mModuleInfo.hInstModule, "VDGetPluginInfo")) {
+				if (GetProcAddress((HINSTANCE)mModuleInfo.hInstModule, "VDGetPluginInfo")) {
 					mModuleInfo.hInstModule = NULL;
 					return;
 				}
@@ -268,11 +249,11 @@ void VDExternalModule::ReconnectOldPlugins() {
 			int ver_hi = VIRTUALDUB_FILTERDEF_VERSION;
 			int ver_lo = VIRTUALDUB_FILTERDEF_COMPATIBLE;
 
-			if (mModuleInfo.initProc(&mModuleInfo, &g_filterFuncs, ver_hi, ver_lo))
+			if (mModuleInfo.initProc(&mModuleInfo, &g_VDFilterCallbacks, ver_hi, ver_lo))
 				throw MyError("Error initializing module \"%s\".",nameA.c_str());
 
 			if (ver_hi < VIRTUALDUB_FILTERDEF_COMPATIBLE) {
-				mModuleInfo.deinitProc(&mModuleInfo, &g_filterFuncs);
+				mModuleInfo.deinitProc(&mModuleInfo, &g_VDFilterCallbacks);
 
 				throw MyError(
 					"This filter was created for an earlier, incompatible filter interface. As a result, it will not "
@@ -280,7 +261,7 @@ void VDExternalModule::ReconnectOldPlugins() {
 			}
 
 			if (ver_lo > VIRTUALDUB_FILTERDEF_VERSION) {
-				mModuleInfo.deinitProc(&mModuleInfo, &g_filterFuncs);
+				mModuleInfo.deinitProc(&mModuleInfo, &g_VDFilterCallbacks);
 
 				throw MyError(
 					"This filter uses too new of a filter interface!  You'll need to upgrade to a newer version of "
@@ -358,7 +339,7 @@ void VDAddInternalPlugins(const VDPluginInfo *const *ppInfo) {
 	VDConnectPluginDescriptions(ppInfo, NULL);
 }
 
-VDExternalModule *VDGetExternalModuleByFilterModule(const FilterModule *fm) {
+VDExternalModule *VDGetExternalModuleByFilterModule(const VDXFilterModule *fm) {
 	std::list<class VDExternalModule *>::const_iterator it(g_pluginModules.begin()),
 			itEnd(g_pluginModules.end());
 

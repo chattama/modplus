@@ -24,6 +24,7 @@
 #include <vd2/system/vdtypes.h>
 #include <vd2/system/filesys.h>
 #include <vd2/system/time.h>
+#include <vd2/system/w32assist.h>
 
 #include "resource.h"
 #include "gui.h"
@@ -303,10 +304,15 @@ void DubStatus::StatusTimerProc(HWND hWnd) {
 	size_to_str(buf, sizeof buf / sizeof buf[0], pvinfo->total_size);
 
 	if (pvinfo->processed) {
-		__int64 divisor = pvinfo->processed*(__int64)pvinfo->usPerFrame;
+		s = buf;
+		while(*s)
+			++s;
 
-		s=buf; while(*s) ++s;
-		sprintf(s, " (%3ldKB/s)", (long)((((pvinfo->total_size+1023)/1024)*1000000i64 + divisor - 1) / divisor));
+		sint64 kilobytes = (pvinfo->total_size + 512) >> 10;
+		double kbPerFrame = (double)kilobytes / (double)pvinfo->processed;
+		double framesPerSecond = pvinfo->mFrameRate.asDouble();
+
+		sprintf(s, " (%3ldKB/s)", VDRoundToInt(kbPerFrame * framesPerSecond));
 	}
 
 	SetDlgItemText(hWnd, IDC_CURRENT_VSIZE, buf);
@@ -621,6 +627,16 @@ INT_PTR CALLBACK DubStatus::StatusPerfDlgProc( HWND hdlg, UINT message, WPARAM w
             return FALSE;
 
 		case WM_TIMER:
+			{
+				VDDubPerfStatus status;
+				thisPtr->pDubber->GetPerfStatus(status);
+
+				VDSetWindowTextFW32(GetDlgItem(hdlg, IDC_STATIC_VIDEOBUFFER), L"%u/%u", status.mVideoBuffersActive, status.mVideoBuffersTotal);
+				VDSetWindowTextFW32(GetDlgItem(hdlg, IDC_STATIC_VIDEOREQUESTS), L"%u", status.mVideoRequestsActive);
+				VDSetWindowTextFW32(GetDlgItem(hdlg, IDC_STATIC_AUDIOBUFFER), L"%u/%uKB", (status.mAudioBufferInUse + 512) >> 10, (status.mAudioBufferTotal + 512) >> 10);
+				VDSetWindowTextFW32(GetDlgItem(hdlg, IDC_STATIC_IOTIME), L"%.0f%%", status.mIOActivityRatio * 100.0f);
+				VDSetWindowTextFW32(GetDlgItem(hdlg, IDC_STATIC_PROCTIME), L"%.0f%%", status.mProcActivityRatio * 100.0f);
+			}
 			return TRUE;
 
     }

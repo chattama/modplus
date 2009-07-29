@@ -61,11 +61,13 @@ void		VDSwitchToFiberW32(LPVOID fiber);
 
 int			VDGetSizeOfBitmapHeaderW32(const BITMAPINFOHEADER *pHdr);
 void		VDSetWindowTextW32(HWND hwnd, const wchar_t *s);
+void		VDSetWindowTextFW32(HWND hwnd, const wchar_t *format, ...);
 VDStringW	VDGetWindowTextW32(HWND hwnd);
 void		VDAppendMenuW32(HMENU hmenu, UINT flags, UINT id, const wchar_t *text);
 void		VDCheckMenuItemByCommandW32(HMENU hmenu, UINT cmd, bool checked);
 void		VDCheckRadioMenuItemByCommandW32(HMENU hmenu, UINT cmd, bool checked);
 void		VDEnableMenuItemByCommandW32(HMENU hmenu, UINT cmd, bool checked);
+VDStringW	VDGetMenuItemTextByCommandW32(HMENU hmenu, UINT cmd);
 void		VDSetMenuItemTextByCommandW32(HMENU hmenu, UINT cmd, const wchar_t *text);
 
 LRESULT		VDDualCallWindowProcW32(WNDPROC wp, HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -88,5 +90,6 @@ bool		VDGetFileSizeW32(HANDLE h, sint64& size);
 bool		VDDrawTextW32(HDC hdc, const wchar_t *s, int nCount, LPRECT lpRect, UINT uFormat);
 
 bool		VDPatchModuleImportTableW32(HMODULE hmod, const char *srcModule, const char *name, void *pCompareValue, void *pNewValue, void *volatile *ppOldValue);
+bool		VDPatchModuleExportTableW32(HMODULE hmod, const char *name, void *pCompareValue, void *pNewValue, void *volatile *ppOldValue);
 
 #endif

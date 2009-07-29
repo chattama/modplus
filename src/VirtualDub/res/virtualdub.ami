@@ -6,7 +6,6 @@ stringset 1 {		// kVDST_Dub
 	message 1, "Dub: Switching to new segment.";
 	message 2, "Dub: I/O thread has not cycled for thirty seconds -- possible livelock. (Thread action: %[1]hs) (Current address: %[0]p)";
 	message 3, "Dub: Processing thread has not cycled for thirty seconds -- possible livelock. (Thread action: %[1]hs) (Current address: %[0]p)";
-	message 4, "Dub: Video codec produced delay frame while trying to flush codec B-frame delay! Ignoring to avert possible infinite loop.";
 	message 5, "Dub: Video codec is requesting B-frame delay %d frames longer than end of video! Stopping video stream to avert possible infinite loop.";
 	message 6, "Dub: Fast recompress mode started with format: %hs.";
 	message 7, "Dub: Recompressing using format: %hs.";
@@ -24,6 +23,7 @@ stringset 2 {		// kVDST_AVIReadHandler
 	message 6, "AVI: Palette changes detected. These are not currently supported -- color palette errors may appear in the output.";
 	message 7, "AVI: The text information chunk of type '%hs' at %llx was not not fully read because it was too long (%u bytes).";
 	message 8, "AVI: Stream %u (%hs) has a non-zero start position of %u samples (%+lld ms). VirtualDub does not currently support a non-zero start time and the stream will be interpreted as starting from zero.";
+	message 9, "AVI: Indexing was aborted at byte location %llx.";
 }
 
 stringset 3 {		// kVDST_VideoSource
@@ -58,7 +58,7 @@ stringset 5 {		// kVDST_Mpeg
 stringset 6 {		// kVDST_AudioSource
 	message 0, "AVI: Truncated or invalid MP3 audio format detected (%d bytes, should be %d). Attempting to fix.";
 	message 1, "AVI: Variable bitrate (VBR) audio detected. VBR audio in AVI is non-standard and you may encounter sync errors up to %.0lfms when attempting to extract WAV files "
-		"or processing the audio in Direct Stream Copy mode. Full Processing mode is recommended to decompress or recompress the audio. (bitrate: %.1lf ± %.1lf kbps)";
+		"or playing in some players. If this is a problem, use Full Processing mode is recommended to decompress or recompress the audio. (This warning can be disabled in Options, Preferences, AVI. bitrate: %.1lf ± %.1lf kbps)";
 	message 2, "AVI: A non-zero wBitsPerSample value was detected in the MP3 audio format structure. This has been corrected in-memory to zero for better compatibility "
 		"with commonly installed MP3 audio codecs.";
 	message 3, "AVI: Truncated or invalid compressed audio format detected (%d bytes, should be %d). Attempting to fix.";
@@ -68,8 +68,8 @@ stringset 7 {		// kVDST_ProjectUI
 	message 0, "%s";
 	message 1, "%s - [%s]";
 	message 2, "%s - [%s] (render in progress)";
-	message 3, "Undo %ls\tCtrl+Z";
-	message 4, "Redo %ls\tCtrl+Y";
+	message 3, "Undo %ls";
+	message 4, "Redo %ls";
 }
 
 stringset 8 {		// kVDST_CaptureUI
@@ -126,6 +126,7 @@ stringset 9 {		// kVDST_Project
 	message 7, "paste";
 	message 8, "scan for errors";
 	message 9, "reset timeline";
+	message 10, "crop to selection";
 }
 
 stringset 10 {		// kVDST_VideoSequenceCompressor
@@ -191,6 +192,10 @@ dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
 				listitem "Timeline";
 				listitem "Render";
 				listitem "Disk I/O";
+				listitem "Images";
+				listitem "Threading";
+				listitem "Playback";
+				listitem "3D accel";
 			}
 
 			pageset 101 : value={@100} {
@@ -202,6 +207,10 @@ dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
 				page 1015;
 				page 1016;
 				page 1017;
+				page 1018;
+				page 1019;
+				page 1020;
+				page 1021;
 			}
 		}
 
@@ -299,6 +308,8 @@ dialog 1011, "" : fill, child {
 				set 200: spacing=3, marginl=40, enable={@103}, vertical, align=fill {
 					now valign=center, marginl=0;
 
+					checkbox 109, "Use high precision conversion";
+					
 					set 0 : align=fill {
 						checkbox 105, "Use effect file:";
 						textedit 300, "" : minw=60, sunken, align=fill, enable={@105};
@@ -309,6 +320,7 @@ dialog 1011, "" : fill, child {
 				checkbox 104, "Use OpenGL" : enable={@101 && !@103};
 				checkbox 106, "Avoid tearing (enable vsync)";
 			}
+			checkbox 110, "Disable accelerated display when inactive";
 			checkbox 108, "Show debug information";
 		}
 	}
@@ -351,6 +363,9 @@ dialog 1013, "" : fill, child {
 				checkbox 202, "Integer SSE";
 				checkbox 203, "SSE";
 				checkbox 204, "SSE2";
+				checkbox 207, "SSE3";
+				checkbox 208, "SSSE3";
+				checkbox 209, "SSE4.1";
 				nextrow;
 				checkbox 205, "3DNow!";
 				checkbox 206, "3DNow! 2";
@@ -373,7 +388,8 @@ dialog 1014, "" : fill, child {
 				label 0, "Byte &threshold:";
 				textedit 200, "" : minw=60, sunken;
 			}
-			checkbox 104, "Prefer internal decoders over installed third-party codecs (MJPEG and DV)" : marginb = 5;
+			checkbox 104, "Prefer internal video decoders over installed third-party codecs (MJPEG and DV)";
+			checkbox 105, "Prefer internal audio decoders over installed third-party codecs" : marginb = 5;
 			
 			grid 0 : spacing=2, fill {
 				now valign = center;
@@ -384,8 +400,10 @@ dialog 1014, "" : fill, child {
 				textedit 202, "" : minw=60, sunken;
 				
 				nextrow;
-				textarea 0, "For AVI files larger than 2GB, approximately one superindex entry is needed for every 2GB block of file, and 1-2 entries for every video frame. The default settings of 256/8192 are good for about 0.5TB and nine hours. Each additional superindex entry adds 16 bytes per stream to the header." : margint=5, colspan=2, fill, readonly, minh=50;
+				textarea 0, "For AVI files larger than 2GB, approximately one superindex entry is needed for every 2GB block of file, and 1-2 entries for every video frame. The default settings of 256/8192 are good for about 0.5TB and nine hours. Each additional superindex entry adds 16 bytes per stream to the header." : margint=5, colspan=2, fill, readonly, minh=40;
 			}
+			
+			checkbox 106, "Warn when VBR audio is detected";
 		}
 	}
 }
@@ -403,6 +421,7 @@ dialog 1015, "" : fill, child {
 							"\n"
 							"%B, %L: byte position and length of source frame\n"
 							"%D: distance from last key frame\n"
+							"%[>]...: use end instead of current position\n"
 							: minh=100, readonly;
 			}
 		}
@@ -413,8 +432,11 @@ dialog 1016, "" : fill, child {
 	now align=fill;
 	set 0: vertical {
 		group 0, "Render options" {
-			now valign=top, align=left;
-			checkbox 100, "Confirm when abort button is pressed";
+			set 0: vertical, spacing=3 {
+				now valign=top, align=left;
+				checkbox 100, "Confirm when abort button is pressed";
+				checkbox 101, "Warn if no audio is written";
+			}
 		}
 	}
 }
@@ -435,7 +457,49 @@ dialog 1017, "" : fill, child {
 	}
 }
 
+dialog 1018, "" : fill, child {
+	now align=fill;
+	set 0: vertical {
+		group 0, "Image sequence defaults" {
+			grid 0 : spacing=2, fill {
+				now valign = center;
+				label 0, "Default frame rate";
+				textedit 100, "" : minw=60, sunken;
+			}
+		}
+	}
+}
 
+dialog 1019, "" : fill, child {
+	now align=fill;
+	set 0: vertical {
+		grid 0 : spacing=2, align=fill, valign=top {
+			label 0, "&Video compression threads";
+			textedit 100, "" : minw=60, sunken;
+
+			nextrow;
+			textarea 0, "Zero disables video compressor multithreading; '1' causes the compressor to run in a separate thread for better performance on dual-core and SMP systems. Values greater than 1 are not yet supported." : margint=5, colspan=2, fill, readonly, minh=40;
+			
+		}
+	}
+}
+
+dialog 1020, "" : fill, child {
+	now align=fill;
+	set 0: vertical {
+		label 0, "&Preferred audio playback device";
+		combobox 100, "";			
+	}
+}
+
+dialog 1021, "" : fill, child {
+	now align=fill;
+	set 0: vertical {
+		group 0, "3D hardware acceleration options" {
+			checkbox 100, "Enable 3D video &filter acceleration (VDXA)";
+		}
+	}
+}
 
 dialog 2000, "Capture preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
 	set 0: vertical, spacing=5 {
@@ -538,6 +602,7 @@ dialog 2101, "Capture timing options" : aspect=140, maxw=350 {
 				checkbox 104, "Use audio timestamps when available";
 				checkbox 105, "Disable timestamps for preview";
 				checkbox 106, "Force audio clock when audio playback is enabled";
+				checkbox 107, "Ignore video timestamps from capture driver";
 			}
 		}
 		
@@ -567,9 +632,14 @@ dialog 3000, "Create test video" : aspect=140, maxw=350 {
 			label 0, "Video";
 			combobox 100 : minw=120 {
 				listitem "RGB color cube";
+				listitem "RGB color cube (TFF)";
+				listitem "RGB color cube (BFF)";
 				listitem "Chroma subsampling offset";
 				listitem "Channel levels";
 				listitem "Checkerboard";
+				listitem "Zone plates";
+				listitem "3:2 pulldown (TFF)";
+				listitem "3:2 pulldown (BFF)";
 			}
 		}
 

@@ -17,74 +17,111 @@
 
 #include "stdafx.h"
 
-#include <windows.h>
-#include <vfw.h>
 #include <vd2/system/error.h>
+#include <vd2/system/profile.h>
+#include <vd2/system/time.h>
+#include <vd2/Riza/audiocodec.h>
 #include <vd2/Riza/audioout.h>
 
 #include "AVIOutput.h"
 #include "AVIOutputPreview.h"
 
+const VDStringW& VDPreferencesGetAudioPlaybackDeviceKey();
+
 ///////////////////////////////////////////////////////////////////////////
 
 AVIAudioPreviewOutputStream::AVIAudioPreviewOutputStream()
 	: mpAudioOut(VDCreateAudioOutputWaveOutW32())
+	, mbInitialized(false)
+	, mbStarted(false)
+	, mbVBRMode(false)
+	, mTotalSamples(0)
+	, mTotalBytes(0)
+	, mBufferLevel(0)
+	, mLastPlayTime(0)
+	, mLastCPUTime(VDGetAccurateTick())
+	, mbFinished(false)
 {
-	initialized = started = FALSE;
-	fInitialized = false;
+	VDRTProfiler *profiler = VDGetRTProfiler();
+	if (profiler) {
+		profiler->RegisterCounterU32("AudioPreview/BufferLevel", &mBufferLevel);
+	}
 }
 
 AVIAudioPreviewOutputStream::~AVIAudioPreviewOutputStream() {
+	VDRTProfiler *profiler = VDGetRTProfiler();
+	if (profiler) {
+		profiler->UnregisterCounter(&mBufferLevel);
+	}
 }
 
-bool AVIAudioPreviewOutputStream::init() {
-	fInitialized = true;
+uint32 AVIAudioPreviewOutputStream::GetPreviewTime() {
+	uint32 cpuTime = VDGetAccurateTick();
+	sint32 t = mpAudioOut->GetPosition();
+	uint32 t2 = t < 0 ? 0 : t;
 
-	return true;
+	if (t2 == mLastPlayTime && mbFinished) {
+		t2 += (cpuTime - mLastCPUTime);
+
+		if (t2 < mLastPlayTime)
+			t2 = mLastPlayTime;
+
+		return t2;
+	}
+
+	if (t2 < mLastPlayTime)
+		t2 = mLastPlayTime;
+
+	mLastPlayTime = t2;
+	mLastCPUTime = cpuTime;
+
+	return t2;
 }
 
 void AVIAudioPreviewOutputStream::initAudio() {
-	const WAVEFORMATEX *pwfex = (const WAVEFORMATEX *)getFormat();
+	const VDWaveFormat *pwfex = (const VDWaveFormat *)getFormat();
 	int blocks;
 	int blocksin512;
 
 	// Figure out what a 'good' buffer size is.
 	// About a 5th of a second sounds good.
 
-	blocks = (pwfex->nAvgBytesPerSec/5 + pwfex->nBlockAlign/2) / pwfex->nBlockAlign;
+	blocks = (pwfex->mDataRate/5 + pwfex->mBlockSize/2) / pwfex->mBlockSize;
 
 	// How many blocks for 512 bytes?  We don't want buffers smaller than that.
 
-	blocksin512 = (512 + pwfex->nBlockAlign - 1) / pwfex->nBlockAlign;
+	blocksin512 = (512 + pwfex->mBlockSize - 1) / pwfex->mBlockSize;
 
 	// Use the smaller value and allocate.
 
-	if (!mpAudioOut->Init(std::max<int>(blocks, blocksin512)*pwfex->nBlockAlign, 10, pwfex))
+	if (!mpAudioOut->Init(std::max<int>(blocks, blocksin512)*pwfex->mBlockSize, 10, (const tWAVEFORMATEX *)pwfex, VDPreferencesGetAudioPlaybackDeviceKey().c_str()))
 		mpAudioOut->GoSilent();
 }
 
-void AVIAudioPreviewOutputStream::write(uint32 flags, const void *pBuffer, uint32 cbBuffer, uint32 lSamples) {
-	fInitialized = true;
-
-	if (!initialized) {
-		initAudio();
-		initialized = true;
-	}
-
-	mpAudioOut->Write(pBuffer, cbBuffer);
+void AVIAudioPreviewOutputStream::write(uint32 flags, const void *pBuffer, uint32 cbBuffer, uint32 samples) {
+	partialWriteBegin(flags, cbBuffer, samples);
+	partialWrite(pBuffer, cbBuffer);
+	partialWriteEnd();
 }
 
 void AVIAudioPreviewOutputStream::partialWriteBegin(uint32 flags, uint32 bytes, uint32 samples) {
-	fInitialized = true;
-
-	if (!initialized) {
+	if (!mbInitialized) {
 		initAudio();
-		initialized = true;
+		mbInitialized = true;
+	}
+
+	mTotalSamples += samples;
+	mTotalBytes += bytes;
+
+	if (!samples) {
+		VDASSERT(!bytes);
+		return;
 	}
 }
 
 void AVIAudioPreviewOutputStream::partialWrite(const void *pBuffer, uint32 cbBuffer) {
 	mpAudioOut->Write(pBuffer, cbBuffer);
+	mBufferLevel = mpAudioOut->GetBufferLevel();
 }
 
 void AVIAudioPreviewOutputStream::partialWriteEnd() {
@@ -95,11 +132,12 @@ bool AVIAudioPreviewOutputStream::isSilent() {
 }
 
 void AVIAudioPreviewOutputStream::start() {
-	if (started || !fInitialized) return;
+	if (mbStarted)
+		return;
 
-	if (!initialized) {
+	if (!mbInitialized) {
 		initAudio();
-		initialized = TRUE;
+		mbInitialized = true;
 	}
 
 	if (!mpAudioOut->Start()) {
@@ -107,29 +145,36 @@ void AVIAudioPreviewOutputStream::start() {
 		mpAudioOut = NULL;
 	}
 
-	started = TRUE;
+	mbStarted = true;
 }
 
 void AVIAudioPreviewOutputStream::stop() {
-	if (started && mpAudioOut)
+	if (mbStarted && mpAudioOut)
 		mpAudioOut->Stop();
 
-	started = FALSE;
+	mbStarted = false;
 
 }
 
 void AVIAudioPreviewOutputStream::flush() {
-	if (mpAudioOut && started)
+	if (mpAudioOut && mbStarted)
 		mpAudioOut->Flush();
 }
 
+void AVIAudioPreviewOutputStream::finish() {
+	mbFinished = true;
+}
+
 void AVIAudioPreviewOutputStream::finalize() {
-	if (mpAudioOut && started)
+	if (mpAudioOut && mbStarted)
 		mpAudioOut->Finalize();
 }
 
-long AVIAudioPreviewOutputStream::getPosition() {
-	return mpAudioOut ? mpAudioOut->GetPosition() : -1;
+double AVIAudioPreviewOutputStream::GetPosition() {
+	if (!mpAudioOut)
+		return -1;
+
+	return mpAudioOut->GetPositionTime();
 }
 
 long AVIAudioPreviewOutputStream::getAvailable() {

@@ -31,6 +31,7 @@
 
 #include <vd2/system/time.h>
 #include <vd2/system/thread.h>
+#include <vd2/system/thunk.h>
 
 #ifdef _MSC_VER
 	#pragma comment(lib, "winmm")
@@ -97,11 +98,17 @@ bool VDCallbackTimer::Init(IVDTimerCallback *pCB, uint32 period_ms) {
 }
 
 bool VDCallbackTimer::Init2(IVDTimerCallback *pCB, uint32 period_100ns) {
+	return Init3(pCB, period_100ns, period_100ns >> 1, true);
+}
+
+bool VDCallbackTimer::Init3(IVDTimerCallback *pCB, uint32 period_100ns, uint32 accuracy_100ns, bool precise) {
 	Shutdown();
 
 	mpCB = pCB;
 	mbExit = false;
-	UINT accuracy = period_100ns / 20000;
+	mbPrecise = precise;
+
+	UINT accuracy = accuracy_100ns / 10000;
 	if (accuracy > 10)
 		accuracy = 10;
 
@@ -166,43 +173,98 @@ void VDCallbackTimer::ThreadRun() {
 
 	HANDLE hExit = msigExit.getHandle();
 
-	while(!mbExit) {
-		uint32 currentTime = VDGetAccurateTick();
-		sint32 delta = nextTimeHi - currentTime;
-
-		if (delta > 0) {
-			// safety guard against the clock going nuts
-			DWORD res;
-			if ((uint32)delta > maxDelay)
-				res = ::WaitForSingleObject(hExit, maxDelay);
-			else
-				res = ::WaitForSingleObject(hExit, nextTimeHi - currentTime);
+	if (!mbPrecise) {
+		while(!mbExit) {
+			DWORD res = ::WaitForSingleObject(hExit, periodHi);
 
 			if (res != WAIT_TIMEOUT)
 				break;
-		}
 
-		if ((uint32)abs(delta) > maxDelay) {
-			nextTimeHi = currentTime + periodHi;
-			nextTimeLo = periodLo;
-		} else {
-			nextTimeLo += periodLo;
-			nextTimeHi += periodHi;
-			if (nextTimeLo >= 10000) {
-				nextTimeLo -= 10000;
-				++nextTimeHi;
+			mpCB->TimerCallback();
+		}
+	} else {
+		while(!mbExit) {
+			uint32 currentTime = VDGetAccurateTick();
+			sint32 delta = nextTimeHi - currentTime;
+
+			if (delta > 0) {
+				// safety guard against the clock going nuts
+				DWORD res;
+				if ((uint32)delta > maxDelay)
+					res = ::WaitForSingleObject(hExit, maxDelay);
+				else
+					res = ::WaitForSingleObject(hExit, nextTimeHi - currentTime);
+
+				if (res != WAIT_TIMEOUT)
+					break;
+			}
+
+			if ((uint32)abs(delta) > maxDelay) {
+				nextTimeHi = currentTime + periodHi;
+				nextTimeLo = periodLo;
+			} else {
+				nextTimeLo += periodLo;
+				nextTimeHi += periodHi;
+				if (nextTimeLo >= 10000) {
+					nextTimeLo -= 10000;
+					++nextTimeHi;
+				}
+			}
+
+			mpCB->TimerCallback();
+
+			int adjust = mTimerPeriodAdjustment.xchg(0);
+			int perdelta = mTimerPeriodDelta;
+
+			if (adjust || perdelta) {
+				timerPeriod += adjust;
+				periodHi = (timerPeriod+perdelta) / 10000;
+				periodLo = (timerPeriod+perdelta) % 10000;
 			}
 		}
-
-		mpCB->TimerCallback();
-
-		int adjust = mTimerPeriodAdjustment.xchg(0);
-		int perdelta = mTimerPeriodDelta;
-
-		if (adjust || perdelta) {
-			timerPeriod += adjust;
-			periodHi = (timerPeriod+perdelta) / 10000;
-			periodLo = (timerPeriod+perdelta) % 10000;
-		}
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+VDLazyTimer::VDLazyTimer()
+	: mTimerId(NULL)
+	, mpCB(NULL)
+{
+	if (!VDInitThunkAllocator())
+		throw MyError("Unable to initialize thunk allocator.");
+
+	mpThunk = VDCreateFunctionThunkFromMethod(this, &VDLazyTimer::StaticTimeCallback, true);
+	if (!mpThunk) {
+		VDShutdownThunkAllocator();
+		throw MyError("Unable to create timer thunk.");
+	}
+}
+
+VDLazyTimer::~VDLazyTimer() {
+	Stop();
+
+	VDDestroyFunctionThunk(mpThunk);
+	VDShutdownThunkAllocator();
+}
+
+void VDLazyTimer::SetOneShot(IVDTimerCallback *pCB, uint32 delay) {
+	Stop();
+
+	mpCB = pCB;
+	mTimerId = SetTimer(NULL, 0, delay, (TIMERPROC)mpThunk);
+}
+
+void VDLazyTimer::Stop() {
+	if (mTimerId) {
+		KillTimer(NULL, mTimerId);
+		mTimerId = 0;
+	}
+}
+
+void VDLazyTimer::StaticTimeCallback(VDZHWND hwnd, VDZUINT msg, VDZUINT_PTR id, VDZDWORD time) {
+	Stop();
+
+	if (mpCB)
+		mpCB->TimerCallback();
 }

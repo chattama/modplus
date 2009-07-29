@@ -363,6 +363,10 @@ VDCaptureDriverScreen::VDCaptureDriverScreen()
 	mbGLOcclusionValid[0] = false;
 	mbGLOcclusionValid[1] = false;
 	mbGLOcclusionPrevFrameValid = false;
+
+	memset(mGLTextures, 0, sizeof mGLTextures);
+	memset(mGLBuffers, 0, sizeof mGLBuffers);
+	memset(mbFrameValid, 0, sizeof mbFrameValid);
 }
 
 VDCaptureDriverScreen::~VDCaptureDriverScreen() {
@@ -425,6 +429,8 @@ void VDCaptureDriverScreen::Shutdown() {
 		KillTimer(mhwnd, mPreviewFrameTimer);
 		mPreviewFrameTimer = 0;
 	}
+
+	ShutdownVideoBuffer();
 
 	SaveSettings();
 
@@ -787,7 +793,7 @@ void VDCaptureDriverScreen::DisplayDriverDialog(DriverDialog dlg) {
 		break;
 	case kDialogVideoSource:
 		ShutdownVideoBuffer();
-		DialogBoxParam(g_hInst, MAKEINTRESOURCE(IDD_SCREENCAP_OPTS), mhwnd, VideoSourceDlgProc, (LONG_PTR)this);
+		DialogBoxParam(g_hInst, MAKEINTRESOURCE(IDD_SCREENCAP_OPTS), mhwnd, VideoSourceDlgProc, (LPARAM)this);
 
 		SaveSettings();
 
@@ -810,7 +816,17 @@ bool VDCaptureDriverScreen::CaptureStart() {
 	ShutdownWaveAnalysis();
 
 	if (!VDINLINEASSERTFALSE(mbCapturing)) {
-		FlushFrameQueue();
+		if (mbOpenGLMode) {
+			HDC hdc = GetDC(mhwndGL);
+			if (hdc) {
+				if (mGL.Begin(hdc)) {
+					FlushFrameQueue();
+					mGL.End();
+				}
+
+				ReleaseDC(mhwndGL, hdc);
+			}
+		}
 
 		if (mpCB->CapEvent(kEventPreroll, 0)) {
 			mpCB->CapBegin(0);
@@ -1198,13 +1214,13 @@ bool VDCaptureDriverScreen::InitVideoBuffer() {
 
 		VDASSERT(!mGL.glGetError());
 
-		mGL.End();
-
-		ReleaseDC(mhwndGL, hdc);
-
 		mbOpenGLMode = true;
 
 		FlushFrameQueue();
+
+		mGL.End();
+
+		ReleaseDC(mhwndGL, hdc);
 
 		mTimestampIndex = 0;
 		mTimestampDelay = 0;
@@ -1622,6 +1638,9 @@ void VDCaptureDriverScreen::DoFrame() {
 							mGL.glDisable(GL_BLEND);
 							mGL.glBindTexture(GL_TEXTURE_2D, mGLTextures[0]);
 						}
+
+						srcx = 0;
+						srcy = 0;
 					}
 
 					if (mbRescaleImage) {
@@ -1815,9 +1834,28 @@ void VDCaptureDriverScreen::DoFrame() {
 			mProfileChannel.Begin(0xf0d0d0, "Capture (GDI)");
 			if (HDC hdc = GetDC(NULL)) {
 				static DWORD sBitBltMode = AutodetectCaptureBltMode();
-				BitBlt(mhdcOffscreen, 0, 0, w, h, hdc, mTrackX, mTrackY, sBitBltMode);
+
+				int srcx = mTrackX;
+				int srcy = mTrackY;
+
+				int limitx = GetSystemMetrics(SM_CXSCREEN) - w;
+				int limity = GetSystemMetrics(SM_CYSCREEN) - h;
+
+				if (srcx > limitx)
+					srcx = limitx;
+
+				if (srcx < 0)
+					srcx = 0;
+
+				if (srcy > limity)
+					srcy = limity;
+
+				if (srcy < 0)
+					srcy = 0;
+
+				BitBlt(mhdcOffscreen, 0, 0, w, h, hdc, srcx, srcy, sBitBltMode);
 				if (ci.hCursor)
-					DrawIcon(mhdcOffscreen, ci.ptScreenPos.x - mTrackX, ci.ptScreenPos.y - mTrackY, ci.hCursor);
+					DrawIcon(mhdcOffscreen, ci.ptScreenPos.x - srcx, ci.ptScreenPos.y - srcy, ci.hCursor);
 				ReleaseDC(NULL, hdc);
 			}
 			mProfileChannel.End();
@@ -1916,7 +1954,25 @@ void VDCaptureDriverScreen::DoFrame() {
 				mProfileChannel.Begin(0xe0e0e0, "Overlay (GDI)");
 				if (HDC hdcScreen = GetDC(NULL)) {
 					if (HDC hdc = GetDC(mhwnd)) {
-						BitBlt(hdc, 0, 0, w, h, hdcScreen, mTrackX, mTrackY, SRCCOPY);
+						int srcx = mTrackX;
+						int srcy = mTrackY;
+
+						int limitx = GetSystemMetrics(SM_CXSCREEN) - w;
+						int limity = GetSystemMetrics(SM_CYSCREEN) - h;
+
+						if (srcx > limitx)
+							srcx = limitx;
+
+						if (srcx < 0)
+							srcx = 0;
+
+						if (srcy > limity)
+							srcy = limity;
+
+						if (srcy < 0)
+							srcy = 0;
+
+						BitBlt(hdc, 0, 0, w, h, hdcScreen, srcx, srcy, SRCCOPY);
 						ReleaseDC(mhwnd, hdc);
 					}
 					ReleaseDC(NULL, hdcScreen);
@@ -2517,13 +2573,26 @@ void VDCaptureDriverScreen::LoadSettings() {
 
 	mbTrackCursor = key.getBool("Track cursor", mbTrackCursor);
 	mbTrackActiveWindow = key.getBool("Track active window", mbTrackActiveWindow);
-	mbTrackActiveWindowClient = key.getBool("Track active window client area", mbTrackActiveWindowClient);
+	mbTrackActiveWindowClient = key.getBool("Track active window client", mbTrackActiveWindowClient);
 	mbDrawMousePointer = key.getBool("Draw mouse pointer", mbDrawMousePointer);
 	mbRescaleImage = key.getBool("Rescale image", mbRescaleImage);
 	mbOpenGLMode = key.getBool("OpenGL mode", mbOpenGLMode);
 	mbRemoveDuplicates = key.getBool("Remove duplicates", mbRemoveDuplicates);
 	mRescaleW = key.getInt("Rescale width", mRescaleW);
 	mRescaleH = key.getInt("Rescale height", mRescaleH);
+
+	if (mRescaleW < 1)
+		mRescaleW = 1;
+
+	if (mRescaleW > 32768)
+		mRescaleW = 32768;
+
+	if (mRescaleH < 1)
+		mRescaleH = 1;
+
+	if (mRescaleH > 32768)
+		mRescaleH = 32768;
+
 	mTrackOffsetX = key.getInt("Position X", mTrackOffsetX);
 	mTrackOffsetY = key.getInt("Position Y", mTrackOffsetY);
 }

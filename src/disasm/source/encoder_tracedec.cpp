@@ -17,17 +17,16 @@ void dump_tracedec(std::vector<char>& dst, const tRuleSystem& rulesys) {
 
 		iterate_forward(std::list<rule>, rs.rules, itRule) {
 			const rule& r = *itRule;
-			std::vector<char>::size_type l;
 			int prematch, postmatch;
 			int i, x, ibest;
 			
-			l = r.match_stream.size();
+			int l = (int)r.match_stream.size();
 
 			ibest = 0;
 			prematch = postmatch = 0;
 
 			for(i=0; i<4; ++i) {
-				size_t l2 = last_match[i].size();
+				int l2 = (int)last_match[i].size();
 				if (l2 > l)
 					l2 = l;
 				int tprematch = std::mismatch(last_match[i].begin(), last_match[i].begin() + l2, r.match_stream.begin()).first - last_match[i].begin();
@@ -92,7 +91,7 @@ void dump_tracedec(std::vector<char>& dst, const tRuleSystem& rulesys) {
 #ifndef _M_AMD64
 	static const char header[64]="[02|02] VirtualDub tracedec module (IA32:P4/Athlon V1.05)\r\n\x1A";
 #else
-	static const char header[64]="[02|02] VirtualDub tracedec module (AMD64:EM64T/Athlon64 V1.0)\r\n\x1A";
+	static const char header[64]="[02|02] VirtualDub tracedec module (AMD64:EM64T/A64 V1.0)\r\n\x1A";
 #endif
 
 	memcpy(&dst[0], header, 64);

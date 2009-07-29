@@ -119,11 +119,13 @@ extern bool (*VDRemoveFile)(const wchar_t *path);
 
 bool VDDoesPathExist(const wchar_t *fileName);
 
+uint64 VDFileGetLastWriteTime(const wchar_t *path);
 VDStringW VDFileGetRootPath(const wchar_t *partialPath);
 VDStringW VDGetFullPath(const wchar_t *partialPath);
 
 VDStringW VDMakePath(const wchar_t *base, const wchar_t *file);
 void VDFileFixDirPath(VDStringW& path);
+VDStringW VDGetLocalModulePath();
 VDStringW VDGetProgramPath();
 
 /////////////////////////////////////////////////////////////////////////////

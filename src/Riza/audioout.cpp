@@ -21,6 +21,9 @@
 #include <cguid.h>
 #include <dsound.h>
 
+#include <vd2/system/math.h>
+#include <vd2/system/text.h>
+#include <vd2/system/VDString.h>
 #include <vd2/Riza/audioout.h>
 
 extern HINSTANCE g_hInst;
@@ -30,14 +33,17 @@ public:
 	VDAudioOutputWaveOutW32();
 	~VDAudioOutputWaveOutW32();
 
-	bool	Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf);
+	bool	Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf, const wchar_t *preferredDevice);
 	void	Shutdown();
 	void	GoSilent();
 
 	bool	IsSilent();
 	bool	IsFrozen();
 	uint32	GetAvailSpace();
+	uint32	GetBufferLevel();
 	sint32	GetPosition();
+	sint32	GetPositionBytes();
+	double	GetPositionTime();
 
 	bool	Start();
 	bool	Stop();
@@ -96,7 +102,26 @@ VDAudioOutputWaveOutW32::~VDAudioOutputWaveOutW32() {
 	Shutdown();
 }
 
-bool VDAudioOutputWaveOutW32::Init(uint32 bufsize, uint32 bufcount, const WAVEFORMATEX *wf) {
+bool VDAudioOutputWaveOutW32::Init(uint32 bufsize, uint32 bufcount, const WAVEFORMATEX *wf, const wchar_t *preferredDevice) {
+	UINT deviceID = WAVE_MAPPER;
+
+	if (preferredDevice && *preferredDevice) {
+		UINT numDevices = waveOutGetNumDevs();
+
+		for(UINT i=0; i<numDevices; ++i) {
+			WAVEOUTCAPSA caps = {0};
+
+			if (MMSYSERR_NOERROR == waveOutGetDevCapsA(i, &caps, sizeof(caps))) {
+				const VDStringW key(VDTextAToW(caps.szPname).c_str());
+
+				if (key == preferredDevice) {
+					deviceID = i;
+					break;
+				}
+			}
+		}
+	}
+
 	mBuffer.resize(bufsize * bufcount);
 	mBlockHead = 0;
 	mBlockTail = 0;
@@ -112,7 +137,7 @@ bool VDAudioOutputWaveOutW32::Init(uint32 bufsize, uint32 bufcount, const WAVEFO
 			return false;
 	}
 
-	MMRESULT res = waveOutOpen(&mhWaveOut, WAVE_MAPPER, wf, (DWORD_PTR)mhWaveEvent, 0, CALLBACK_EVENT);
+	MMRESULT res = waveOutOpen(&mhWaveOut, deviceID, wf, (DWORD_PTR)mhWaveEvent, 0, CALLBACK_EVENT);
 	if (MMSYSERR_NOERROR != res) {
 		Shutdown();
 		return false;
@@ -260,6 +285,18 @@ uint32 VDAudioOutputWaveOutW32::GetAvailSpace() {
 	return (mBlockCount - mBlocksPending) * mBlockSize - mBlockWriteOffset;
 }
 
+uint32 VDAudioOutputWaveOutW32::GetBufferLevel() {
+	CheckBuffers();
+
+	uint32 level = mBlocksPending * mBlockSize;
+	if (mBlockWriteOffset) {
+		level -= mBlockSize;
+		level += mBlockWriteOffset;
+	}
+
+	return level;
+}
+
 bool VDAudioOutputWaveOutW32::Write(const void *data, uint32 len) {
 	if (mCurState == kStateSilent)
 		return true;
@@ -376,6 +413,62 @@ sint32 VDAudioOutputWaveOutW32::GetPosition() {
 	return -1;
 }
 
+sint32 VDAudioOutputWaveOutW32::GetPositionBytes() {
+	MMTIME mmtime;
+
+	if (mCurState != kStatePlaying) return -1;
+
+	mmtime.wType = TIME_BYTES;
+
+	MMRESULT res;
+
+	vdsynchronized(mcsWaveDevice) {
+		res = waveOutGetPosition(mhWaveOut, &mmtime, sizeof mmtime);
+	}
+
+	if (MMSYSERR_NOERROR != res)
+		return -1;
+
+	switch(mmtime.wType) {
+	case TIME_BYTES:
+		return mmtime.u.cb;
+	case TIME_MS:
+		return MulDiv(mmtime.u.ms, mAvgBytesPerSec, 1000);
+	case TIME_SAMPLES:
+		return MulDiv(mmtime.u.sample, mAvgBytesPerSec, mSamplesPerSec);
+	}
+
+	return -1;
+}
+
+double VDAudioOutputWaveOutW32::GetPositionTime() {
+	MMTIME mmtime;
+
+	if (mCurState != kStatePlaying) return -1;
+
+	mmtime.wType = TIME_MS;
+
+	MMRESULT res;
+
+	vdsynchronized(mcsWaveDevice) {
+		res = waveOutGetPosition(mhWaveOut, &mmtime, sizeof mmtime);
+	}
+
+	if (MMSYSERR_NOERROR != res)
+		return -1;
+
+	switch(mmtime.wType) {
+	case TIME_BYTES:
+		return (double)mmtime.u.cb / (double)mAvgBytesPerSec;
+	case TIME_MS:
+		return (double)mmtime.u.ms / 1000.0;
+	case TIME_SAMPLES:
+		return (double)mmtime.u.sample / (double)mSamplesPerSec;
+	}
+
+	return -1;
+}
+
 bool VDAudioOutputWaveOutW32::IsFrozen() {
 	if (mCurState != kStatePlaying)
 		return true;
@@ -392,14 +485,17 @@ public:
 	VDAudioOutputDirectSoundW32();
 	~VDAudioOutputDirectSoundW32();
 
-	bool	Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf);
+	bool	Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf, const wchar_t *preferredDevice);
 	void	Shutdown();
 	void	GoSilent();
 
 	bool	IsSilent();
 	bool	IsFrozen();
 	uint32	GetAvailSpace();
+	uint32	GetBufferLevel();
 	sint32	GetPosition();
+	sint32	GetPositionBytes();
+	double	GetPositionTime();
 
 	bool	Start();
 	bool	Stop();
@@ -420,6 +516,8 @@ private:
 
 	uint32	mBufferSize;
 	uint32	mTailCursor;
+
+	double	mMillisecsPerByte;
 
 	enum InitState {
 		kStateNone		= 0,
@@ -446,7 +544,7 @@ VDAudioOutputDirectSoundW32::VDAudioOutputDirectSoundW32()
 VDAudioOutputDirectSoundW32::~VDAudioOutputDirectSoundW32() {
 }
 
-bool VDAudioOutputDirectSoundW32::Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf) {
+bool VDAudioOutputDirectSoundW32::Init(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf, const wchar_t *preferredDevice) {
 	if (!Init2(bufsize, bufcount, wf)) {
 		Shutdown();
 		return false;
@@ -456,6 +554,7 @@ bool VDAudioOutputDirectSoundW32::Init(uint32 bufsize, uint32 bufcount, const tW
 
 bool VDAudioOutputDirectSoundW32::Init2(uint32 bufsize, uint32 bufcount, const tWAVEFORMATEX *wf) {
 	mBufferSize = bufsize * bufcount;
+	mMillisecsPerByte = 1000.0 * (double)wf->nBlockAlign / (double)wf->nAvgBytesPerSec;
 
 	// attempt to load DirectSound library
 	mhmodDS = LoadLibraryA("dsound");
@@ -585,11 +684,26 @@ uint32 VDAudioOutputDirectSoundW32::GetAvailSpace() {
 	return (uint32)space;
 }
 
+uint32 VDAudioOutputDirectSoundW32::GetBufferLevel() {
+	return mBufferSize - GetAvailSpace();
+}
+
 sint32 VDAudioOutputDirectSoundW32::GetPosition() {
 	DWORD playCursor;
 	HRESULT hr = mpDSBuffer->GetCurrentPosition(&playCursor, NULL);
 
+	return VDRoundToInt32(playCursor * mMillisecsPerByte);
+}
+
+sint32 VDAudioOutputDirectSoundW32::GetPositionBytes() {
+	DWORD playCursor;
+	HRESULT hr = mpDSBuffer->GetCurrentPosition(&playCursor, NULL);
+
 	return playCursor;
+}
+
+double VDAudioOutputDirectSoundW32::GetPositionTime() {
+	return GetPosition() / 1000.0;
 }
 
 bool VDAudioOutputDirectSoundW32::Start() {

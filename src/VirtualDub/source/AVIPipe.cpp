@@ -66,25 +66,11 @@ bool AVIPipe::isFinalizeAcked() {
 }
 
 bool AVIPipe::full() {
-	int h;
-
 	vdsynchronized(mcsQueue) {
 		if (mState & kFlagAborted)
 			return false;
 
-		// look for a handle without a buffer
-
-		for(h=0; h<num_buffers; h++)
-			if (!pBuffers[h].mFrameInfo.mpData)
-				return false;
-		
-		// look for a handle with a free buffer
-		
-		for(h=0; h<num_buffers; h++)
-			if (!pBuffers[h].mbInUse)
-				return false;
-
-		return true;
+		return mLevel >= num_buffers;
 	}
 
 	return false;
@@ -209,15 +195,18 @@ void AVIPipe::getDropDistances(int& total, int& indep) {
 	--mcsQueue;
 }
 
-void AVIPipe::getQueueInfo(int& total, int& finals) {
+void AVIPipe::getQueueInfo(int& total, int& finals, int& allocated) {
 	total = 0;
 	finals = 0;
+	allocated = num_buffers;
+
 	++mcsQueue;
 
 	int h = mReadPt;
 	for(int cnt = mLevel; cnt>0; --cnt) {
 		if (pBuffers[h].mbInUse) {
 			++total;
+			++finals;
 			if (pBuffers[h].mFrameInfo.mbFinal)
 				++finals;
 		}
@@ -263,14 +252,6 @@ void AVIPipe::releaseBuffer() {
 void AVIPipe::finalize() {
 	mState |= kFlagFinalizeTriggered;
 	msigWrite.signal();
-}
-
-void AVIPipe::finalizeAndWait() {
-	finalize();
-
-	while(!(mState & kFlagFinalizeAcknowledged)) {
-		msigRead.wait();
-	}
 }
 
 void AVIPipe::finalizeAck() {

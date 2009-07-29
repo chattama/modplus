@@ -53,6 +53,10 @@ VDThreadID VDGetCurrentThreadID() {
 	return (VDThreadID)GetCurrentThreadId();
 }
 
+VDProcessId VDGetCurrentProcessId() {
+	return (VDProcessId)GetCurrentProcessId();
+}
+
 void VDSetThreadDebugName(VDThreadID tid, const char *name) {
 	THREADNAME_INFO info;
 	info.dwType		= 0x1000;
@@ -65,6 +69,13 @@ void VDSetThreadDebugName(VDThreadID tid, const char *name) {
 	} __except (EXCEPTION_CONTINUE_EXECUTION) {
 	}
 }
+
+void VDThreadSleep(int milliseconds) {
+	if (milliseconds > 0)
+		::Sleep(milliseconds);
+}
+
+///////////////////////////////////////////////////////////////////////////
 
 VDThread::VDThread(const char *pszDebugName)
 	: mpszDebugName(pszDebugName)
@@ -218,6 +229,46 @@ int VDSignalBase::wait(VDSignalBase *second, VDSignalBase *third) {
 	return dwRet == WAIT_FAILED ? -1 : dwRet - WAIT_OBJECT_0;
 }
 
+int VDSignalBase::waitMultiple(const VDSignalBase **signals, int count) {
+	VDASSERT(count <= 16);
+
+	HANDLE handles[16];
+	int active = 0;
+
+	for(int i=0; i<count; ++i) {
+		HANDLE h = signals[i]->hEvent;
+
+		if (h)
+			handles[active++] = h;
+	}
+
+	if (!active)
+		return -1;
+
+	DWORD dwRet = WaitForMultipleObjects(active, handles, FALSE, INFINITE);
+
+	return dwRet == WAIT_FAILED ? -1 : dwRet - WAIT_OBJECT_0;
+}
+
 void VDSignalPersistent::unsignal() {
 	ResetEvent(hEvent);
+}
+
+VDSemaphore::VDSemaphore(int initial)
+	: mKernelSema(CreateSemaphore(NULL, initial, 0x0fffffff, NULL))
+{
+}
+
+VDSemaphore::~VDSemaphore() {
+	if (mKernelSema)
+		CloseHandle(mKernelSema);
+}
+
+void VDSemaphore::Reset(int count) {
+	// reset semaphore to zero
+	while(WAIT_OBJECT_0 == WaitForSingleObject(mKernelSema, 0))
+		;
+
+	if (count)
+		ReleaseSemaphore(mKernelSema, count, NULL);
 }

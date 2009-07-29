@@ -18,68 +18,100 @@
 #ifndef f_VIRTUALDUB_FILTERSYSTEM_H
 #define f_VIRTUALDUB_FILTERSYSTEM_H
 
-#include <windows.h>
+#ifdef _MSC_VER
+	#pragma once
+#endif
 
 #include <vd2/system/list.h>
-#include "vbitmap.h"
+#include <vd2/system/fraction.h>
+#include <vd2/system/refcount.h>
 #include "filter.h"
 
-class FilterActivation;
 class FilterInstance;
-class FilterStateInfo;
+class VDXFilterStateInfo;
 class FilterSystemBitmap;
+class VFBitmapInternal;
+struct VDPixmap;
+struct VDPixmapLayout;
+class IVDFilterFrameSource;
+class IVDFilterFrameClientRequest;
+class VDFilterFrameRequest;
+
+class IVDFilterSystemScheduler : public IVDRefCount {
+public:
+	virtual void Reschedule() = 0;
+	virtual bool Block() = 0;
+};
 
 class FilterSystem {
-private:
-	DWORD dwFlags;
-	int iBitmapCount;
-
-	enum {
-		FILTERS_INITIALIZED = 0x00000001L,
-		FILTERS_ERROR		= 0x00000002L,
-	};
-
-	FilterStateInfo	mfsi;
-	FilterSystemBitmap *bitmap;
-	FilterSystemBitmap *bmLast;
-	List *listFilters;
-	int nFrameLag;
-	int mFrameDelayLeft;
-	bool mbFirstFrame;
-
-	HBITMAP hbmSrc;
-	HDC		hdcSrc;
-	HGDIOBJ	hgoSrc;
-
-	HANDLE hFileShared;
-	unsigned char *lpBuffer;
-	long lAdditionalBytes;
-	bool fSharedWindow;
-
-	void AllocateVBitmaps(int count);
-	void AllocateBuffers(LONG lTotalBufferNeeded);
-
+	FilterSystem(const FilterSystem&);
+	FilterSystem& operator=(const FilterSystem&);
 public:
 	FilterSystem();
 	~FilterSystem();
-	void prepareLinearChain(List *listFA, Pixel *src_pal, PixDim src_width, PixDim src_height, int dest_depth);
-	void initLinearChain(List *listFA, Pixel *src_pal, PixDim src_width, PixDim src_height, int dest_depth);
-	int ReadyFilters(const FilterStateInfo&);
-	void RestartFilters();
-	bool RunFilters(const FilterStateInfo&, FilterInstance *pfiStopPoint = NULL);
+
+	void SetAccelEnabled(bool enable);
+	void SetVisualAccelDebugEnabled(bool enable);
+
+	void prepareLinearChain(List *listFA, uint32 src_width, uint32 src_height, int src_format, const VDFraction& sourceFrameRate, sint64 sourceFrameCount, const VDFraction& sourcePixelAspect);
+	void initLinearChain(IVDFilterSystemScheduler *scheduler, uint32 filterStateFlags, List *listFA, IVDFilterFrameSource *src, uint32 src_width, uint32 src_height, int src_format, const uint32 *palette, const VDFraction& sourceFrameRate, sint64 sourceFrameCount, const VDFraction& sourcePixelAspect);
+	void ReadyFilters();
+
+	bool RequestFrame(sint64 outputFrame, IVDFilterFrameClientRequest **creq);
+
+	enum RunResult {
+		kRunResult_Idle,		// All filters are idle.
+		kRunResult_Running,		// There are still filters to run, and some can be run on this thread.
+		kRunResult_Blocked		// There are still filters to run, but all are waiting for asynchronous operation.
+	};
+
+	RunResult Run(bool runToCompletion);
+
+	void InvalidateCachedFrames(FilterInstance *startingFilter);
+
 	void DeinitFilters();
 	void DeallocateBuffers();
-	VBitmap *InputBitmap();
-	VBitmap *OutputBitmap();
-	VBitmap *LastBitmap();
-	bool isRunning();
-	bool isEmpty() const { return listFilters->IsEmpty(); }
+	const VDPixmapLayout& GetInputLayout() const;
+	const VDPixmapLayout& GetOutputLayout() const;
+	bool isRunning() const;
+	bool isEmpty() const;
 
-	int getFrameLag();
+	bool GetDirectFrameMapping(VDPosition outputFrame, VDPosition& sourceFrame, int& sourceIndex) const;
+	sint64	GetSourceFrame(sint64 outframe) const;
+	sint64	GetSymbolicFrame(sint64 outframe, IVDFilterFrameSource *source) const;
+	sint64	GetNearestUniqueFrame(sint64 outframe) const;
 
-	bool getOutputMappingParams(HANDLE&, LONG&);
+	const VDFraction GetOutputFrameRate() const;
+	const VDFraction GetOutputPixelAspect() const;
+	sint64	GetOutputFrameCount() const;
 
-	bool IsFiltered(VDPosition frame) const;
+private:
+	void AllocateVBitmaps(int count);
+	void AllocateBuffers(uint32 lTotalBufferNeeded);
+
+	struct Bitmaps;
+
+	bool	mbFiltersInited;
+	bool	mbFiltersError;
+	bool	mbFiltersUseAcceleration;
+	bool	mbAccelDebugVisual;
+	bool	mbAccelEnabled;
+
+	VDFraction	mOutputFrameRate;
+	VDFraction	mOutputPixelAspect;
+	sint64		mOutputFrameCount;
+
+	Bitmaps *mpBitmaps;
+
+	unsigned char *lpBuffer;
+	long lRequiredSize;
+	uint32	mFilterStateFlags;
+
+	typedef vdfastvector<IVDFilterFrameSource *> Filters;
+	Filters mFilters;
+	Filters mActiveFilters;
+
+	uint32	mPalette[256];
 };
 
 #endif

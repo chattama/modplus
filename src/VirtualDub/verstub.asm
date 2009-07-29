@@ -1,13 +1,13 @@
-	.const
+	segment	.const
 
-	public	version_num
-	public	version_time
-	public	version_date
-	public	version_buildmachine
+	global	version_num
+	global	version_time
+	global	version_date
+	global	version_buildmachine
 
-version_num	dd	28346
-version_time	db	"Tue Feb 12 22:13:09 2008",0
-version_date	db	"February 12, 2008",0
-version_buildmachine	db	"KOS-MOS",0
+version_num	dd	32559
+version_time	db	"Mon Jul 27 13:58:52 2009",0
+version_date	db	"July 27, 2009",0
+version_buildmachine	db	"Aegis",0
 
 	end

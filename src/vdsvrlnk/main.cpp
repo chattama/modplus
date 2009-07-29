@@ -169,8 +169,9 @@ static void ranko() {
 
 static void ranma() {
 	_RPT1(0,"server: unlock mutex %p\n", hMutex);
-	if (!ReleaseMutex(hMutex))
+	if (!ReleaseMutex(hMutex)) {
 		_RPT0(0,"Hey!  I didn't own the mutex!\n");
+	}
 }
 
 ////////////////////////////////////////////
@@ -335,7 +336,7 @@ int CVDubAnimConnection::readVideo(long lSample, void *lpBuffer) {
 	if (VDSRVERR_OK != (err = SendMessage((HWND)LongToHandle(frameserver->hwndServer), VDSRVM_REQ_FRAME, lSample, dwSessionID)))
 		return err;
 
-	_RPT2(0,"Copying %ld bytes to user buffer from arena %P\n", lFrameSize, arena);
+	_RPT2(0,"Copying %ld bytes to user buffer from arena %p\n", lFrameSize, arena);
 	memcpy(lpBuffer, arena, lFrameSize);
 	_RPT0(0,"Copy completed.\n");
 

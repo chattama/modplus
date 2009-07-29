@@ -107,14 +107,16 @@ public:
 	}
 
 	inline virtual int Release() {
-		if (mRefCount == 1) {		// We are the only reference, so there is no threading issue.  Don't decrement to zero as this can cause double destruction with a temporary addref/release in destruction.
+		int rc = --mRefCount;
+
+		if (!rc) {
 			delete this;
 			return 0;
 		}
 
-		VDASSERT(mRefCount > 1);
+		VDASSERT(rc > 0);
 
-		return mRefCount.dec();
+		return rc;
 	}
 
 protected:
@@ -230,6 +232,13 @@ public:
 		ptr = NULL;
 		return p;
 	}
+
+	/// Swaps the references between two smart pointers.
+	void swap(vdrefptr& r) {
+		T *p = ptr;
+		ptr = r.ptr;
+		r.ptr = p;
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -243,6 +252,31 @@ bool VDRefCountObjectFactory(U **pp) {
 	*pp = static_cast<U *>(p);
 	p->AddRef();
 	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////
+
+struct vdsaferelease_t {};
+extern vdsaferelease_t vdsaferelease;
+
+template<class T>
+inline vdsaferelease_t& operator<<=(vdsaferelease_t& x, T *& p) {
+	if (p) {
+		p->Release();
+		p = 0;
+	}
+
+	return x;
+}
+
+template<class T>
+inline vdsaferelease_t& operator,(vdsaferelease_t& x, T *& p) {
+	if (p) {
+		p->Release();
+		p = 0;
+	}
+
+	return x;
 }
 
 #endif

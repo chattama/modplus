@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <vd2/system/event.h>
+#include <vd2/system/thread.h>
 #include <vd2/Riza/display.h>
 
 #include "project.h"
@@ -29,6 +30,7 @@
 #include "uiframe.h"
 #include "ParameterCurveControl.h"
 #include "AudioDisplay.h"
+#include "AccelEditDialog.h"
 
 class IVDPositionControl;
 class IVDUIWindow;
@@ -46,18 +48,25 @@ public:
 
 	void SetTitle(int nTitleString, int nArgs, ...);
 
+	enum PaneLayoutMode {
+		kPaneLayoutDual,
+		kPaneLayoutInput,
+		kPaneLayoutOutput,
+		kPaneLayoutModeCount
+	};
+
+	void SetPaneLayout(PaneLayoutMode layout);
+
 	void OpenAsk();
 	void AppendAsk();
-	void SaveAVIAsk();
-	void SaveCompatibleAVIAsk();
-	void SaveStripedAVIAsk();
-	void SaveStripeMasterAsk();
-	void SaveImageSequenceAsk();
-	void SaveSegmentedAVIAsk();
-	void SaveWAVAsk();
+	void SaveAVIAsk(bool batchMode);
+	void SaveCompatibleAVIAsk(bool batchMode);
+	void SaveImageSequenceAsk(bool batchMode);
+	void SaveSegmentedAVIAsk(bool batchMode);
+	void SaveWAVAsk(bool batchMode);
 	void SaveFilmstripAsk();
 	void SaveAnimatedGIFAsk();
-	void SaveRawAudioAsk();
+	void SaveRawAudioAsk(bool batchMode);
 	void SaveConfigurationAsk();
 	void LoadConfigurationAsk();
 	void SetVideoFiltersAsk();
@@ -76,9 +85,13 @@ public:
 	void JumpToFrameAsk();
 
 protected:
+	void QueueCommand(int cmd);
+	void ExecuteCommand(int cmd);
+
 	LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	LRESULT MainWndProc( UINT msg, WPARAM wParam, LPARAM lParam);
 	LRESULT DubWndProc(UINT msg, WPARAM wParam, LPARAM lParam);
+	void OnPositionNotify(int cmd);
 	void OnSize();
 	void HandleDragDrop(HDROP hdrop);
 	void OnPreferencesChanged();
@@ -87,23 +100,27 @@ protected:
 	void ShowMenuHelp(WPARAM wParam);
 	bool DoFrameRightClick(LPARAM lParam);
 	void UpdateMainMenu(HMENU hMenu);
+	void UpdateAudioSourceMenu();
 	void UpdateDubMenu(HMENU hMenu);
 	void RepositionPanes();
 	void UpdateVideoFrameLayout();
 
 	void OpenAudioDisplay();
 	void CloseAudioDisplay();
+	bool TickAudioDisplay();
 	void UpdateAudioDisplay();
 	void UpdateAudioDisplayPosition();
 
 	void OpenCurveEditor();
 	void CloseCurveEditor();
 	void UpdateCurveList();
+	void UpdateCurveEditorPosition();
 
-	void UIRefreshInputFrame(bool bValid);
-	void UIRefreshOutputFrame(bool bValid);
+	void UIRefreshInputFrame(const VDPixmap *px);
+	void UIRefreshOutputFrame(const VDPixmap *px);
 	void UISetDubbingMode(bool bActive, bool bIsPreview);
-	void UIRunDubMessageLoop();
+	bool UIRunDubMessageLoop();
+	void UIAbortDubMessageLoop();
 	void UICurrentPositionUpdated();
 	void UISelectionUpdated(bool notifyUser);
 	void UITimelineUpdated();
@@ -118,6 +135,8 @@ protected:
 	void SetStatus(const wchar_t *s);
 
 	void DisplayRequestUpdate(IVDVideoDisplay *pDisp);
+	void RefreshInputPane();
+	void RefreshOutputPane();
 
 	bool GetFrameString(wchar_t *buf, size_t buflen, VDPosition dstFrame);
 
@@ -153,6 +172,7 @@ protected:
 	bool		mbAudioDisplayReadActive;
 
 	HMENU		mhMenuNormal;
+	HMENU		mhMenuSourceList;
 	HMENU		mhMenuDub;
 	HMENU		mhMenuDisplay;
 	int			mMRUListPosition;
@@ -169,7 +189,18 @@ protected:
 	bool		mbPositionControlVisible;
 	bool		mbStatusBarVisible;
 
+	bool		mbLockPreviewRestart;
+
+	PaneLayoutMode	mPaneLayoutMode;
+	bool		mbPaneLayoutBusy;
+	bool		mbAutoSizePanes;
+
+	VDThreadID	mThreadId;
+
 	MRUList		mMRUList;
+
+	typedef vdfastvector<int> PendingCommands;
+	PendingCommands		mPendingCommands;
 
 	vdrefptr<IVDUIWindow>	mpUIPeer;
 	vdrefptr<IVDUIWindow>	mpUIBase;
@@ -184,6 +215,9 @@ protected:
 
 	vdrefptr<IVDUIWindow>	mpUIAudioSplitBar;
 	vdrefptr<IVDUIWindow>	mpUIAudioDisplay;
+
+	VDAccelTableDefinition	mAccelTableDef;
+	VDAccelTableDefinition	mAccelTableDefault;
 
 	VDDelegate mCurveUpdatedDelegate;
 	VDDelegate mCurveStatusUpdatedDelegate;

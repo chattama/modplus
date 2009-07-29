@@ -389,6 +389,24 @@ const vdint128 vdint128::operator*(const vdint128& x) const {
 	return (q[1]^x.q[1])<0 ? -(const vdint128&)bd : (const vdint128&)bd;
 }
 
+const vdint128 vdint128::operator/(int x) const {
+	vdint128 r;
+	sint64 accum;
+
+	r.d[3] = d[3] / x;
+	
+	accum = ((sint64)(d[3] % x) << 32) + d[2];
+	r.d[2] = (sint32)(accum / x);
+
+	accum = ((accum % x) << 32) + d[1];
+	r.d[1] = (sint32)(accum / x);
+
+	accum = ((accum % x) << 32) + d[0];
+	r.d[0] = (sint32)(accum / x);
+
+	return r;
+}
+
 vdint128::operator double() const {
 	return (double)(unsigned long)q[0]
 		+ ldexp((double)(unsigned long)((unsigned __int64)q[0]>>32), 32)
@@ -424,13 +442,13 @@ const vduint128 vduint128::operator*(const vduint128& x) const {
 			mul		dword ptr [esp+20]		;EDX:EAX = BC
 			add		[ecx+4],eax
 			adc		[ecx+8],edx
-			adc		[ecx+12], 0
+			adc		dword ptr [ecx+12], 0
 
 			mov		eax,[esp+12]
 			mul		dword ptr [esp+16]		;EDX:EAX = AD
 			add		[ecx+4],eax
 			adc		[ecx+8],edx
-			adc		[ecx+12], 0
+			adc		dword ptr [ecx+12], 0
 
 			mov		eax, ecx
 			ret

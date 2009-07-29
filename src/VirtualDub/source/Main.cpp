@@ -80,6 +80,8 @@ wchar_t g_szInputAVIFile[MAX_PATH];
 wchar_t g_szInputWAVFile[MAX_PATH];
 wchar_t g_szFile[MAX_PATH];
 
+char g_serverName[256];
+
 extern const char g_szError[]="VirtualDub Error";
 extern const char g_szWarning[]="VirtualDub Warning";
 
@@ -91,7 +93,6 @@ extern bool Init(HINSTANCE hInstance, int nCmdShow, VDCommandLine& cmdLine);
 extern void Deinit();
 
 void OpenAVI(int index, bool extended_opt);
-void PreviewAVI(HWND, DubOptions *, int iPriority=0, bool fProp=false);
 void SaveAVI(HWND, bool);
 void SaveSegmentedAVI(HWND);
 void SaveImageSeq(HWND);
@@ -153,7 +154,7 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			}
 		}
 
-		if (!g_project->Tick() && !g_projectui->Tick()) {
+		if (!g_project->Tick() && !g_projectui->Tick() && !JobPollAutoRun()) {
 			VDClearEvilCPUStates();		// clear evil CPU states set by Borland DLLs
 
 			WaitMessage();
@@ -209,7 +210,7 @@ void VDSwitchUIFrameMode(HWND hwnd, int nextMode) {
 		// case 2 is the main project mode
 
 	case 3:
-		ActivateFrameServerDialog(hwnd);
+		ActivateFrameServerDialog(hwnd, g_serverName);
 		// fall through and reconnect main project when done
 		break;
 	}
@@ -242,6 +243,7 @@ static const wchar_t fileFiltersSaveConfig[]=
 		L"Sylia script for VirtualDub (*.syl)\0"	L"*.syl\0"
 		L"All files (*.*)\0"						L"*.*\0"
 		;
+
 
   
 void OpenAVI(bool ext_opt) {
@@ -284,48 +286,33 @@ void OpenAVI(bool ext_opt) {
 
 ////////////////////////////////////
 
-void SaveAVI(HWND hWnd, bool fUseCompatibility) {
-	if (!inputVideoAVI) {
+void SaveAVI(HWND hWnd, bool fUseCompatibility, bool queueAsJob) {
+	if (!inputVideo) {
 		MessageBox(hWnd, "No input video stream to process.", g_szError, MB_OK);
 		return;
 	}
 
-	static const VDFileDialogOption sOptions[]={
-		{ VDFileDialogOption::kBool, 0, L"Don't run this job now; &add it to job control so I can run it in batch mode.", 0, 0 },
-		{0}
-	};
-
-	int optVals[1]={0};
-
-	VDStringW fname(VDGetSaveFileName(VDFSPECKEY_SAVEVIDEOFILE, (VDGUIHandle)hWnd, fUseCompatibility ? L"Save AVI 1.0 File" : L"Save AVI 2.0 File", fileFilters0, L"avi", sOptions, optVals));
+	VDStringW fname(VDGetSaveFileName(VDFSPECKEY_SAVEVIDEOFILE, (VDGUIHandle)hWnd, fUseCompatibility ? L"Save AVI 1.0 File" : L"Save AVI 2.0 File", fileFilters0, L"avi"));
 	if (!fname.empty()) {
-		bool fAddAsJob = !!optVals[0];
-
-		if (fAddAsJob) {
-			JobAddConfiguration(&g_dubOpts, g_szInputAVIFile, NULL, fname.c_str(), fUseCompatibility, &inputAVI->listFiles, 0, 0);
-		} else {
-			SaveAVI(fname.c_str(), false, NULL, fUseCompatibility);
-		}
+		g_project->SaveAVI(fname.c_str(), fUseCompatibility, queueAsJob);
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////
 
-static const char g_szRegKeyRunAsJob[]="Run as job";
 static const char g_szRegKeySegmentFrameCount[]="Segment frame limit";
 static const char g_szRegKeyUseSegmentFrameCount[]="Use segment frame limit";
 static const char g_szRegKeySegmentSizeLimit[]="Segment size limit";
 static const char g_szRegKeySaveSelectionAndEditList[]="Save edit list";
 static const char g_szRegKeySaveTextInfo[]="Save text info";
   
-void SaveSegmentedAVI(HWND hWnd) {
-	if (!inputVideoAVI) {
+void SaveSegmentedAVI(HWND hWnd, bool queueAsJob) {
+	if (!inputVideo) {
 		MessageBox(hWnd, "No input video stream to process.", g_szError, MB_OK);
 		return;
 	}
 
 	static const VDFileDialogOption sOptions[]={
-		{ VDFileDialogOption::kBool, 0, L"Don't run this job now; &add it to job control so I can run it in batch mode.", 0, 0 },
 		{ VDFileDialogOption::kEnabledInt, 1, L"&Limit number of video frames per segment:", 1, 0x7fffffff },
 		{ VDFileDialogOption::kInt, 3, L"File segment &size limit in MB (50-2048):", 50, 2048 },
 		{0}
@@ -333,7 +320,7 @@ void SaveSegmentedAVI(HWND hWnd) {
 
 	VDRegistryAppKey key(g_szRegKeyPersistence);
 	int optVals[4]={
-		key.getBool(g_szRegKeyRunAsJob, false),
+		0,
 		key.getBool(g_szRegKeyUseSegmentFrameCount, false),
 		key.getInt(g_szRegKeySegmentFrameCount, 100),
 		key.getInt(g_szRegKeySegmentSizeLimit, 2000),
@@ -342,7 +329,6 @@ void SaveSegmentedAVI(HWND hWnd) {
 	VDStringW fname(VDGetSaveFileName(VDFSPECKEY_SAVEVIDEOFILE, (VDGUIHandle)hWnd, L"Save segmented AVI", fileFiltersAppend, L"avi", sOptions, optVals));
 
 	if (!fname.empty()) {
-		key.setBool(g_szRegKeyRunAsJob, !!optVals[0]);
 		key.setBool(g_szRegKeyUseSegmentFrameCount, !!optVals[1]);
 		if (optVals[1])
 			key.setInt(g_szRegKeySegmentFrameCount, optVals[2]);
@@ -433,28 +419,12 @@ void SaveSegmentedAVI(HWND hWnd) {
 			}
 		}
 
-		if (!!optVals[0]) {
+		if (queueAsJob) {
 			JobAddConfiguration(&g_dubOpts, g_szInputAVIFile, NULL, fname.c_str(), true, &inputAVI->listFiles, optVals[3], optVals[1] ? optVals[2] : 0);
 		} else {
 			SaveSegmentedAVI(fname.c_str(), false, NULL, optVals[3], optVals[1] ? optVals[2] : 0);
 		}
 	}
-}
-
-///////////////////////////////////////////////////////////////////////////
-
-void PreviewAVI(HWND hWnd, DubOptions *quick_options, int iPriority, bool fProp) {
-	if (!inputVideoAVI)
-		throw MyError("No input video stream to process.");
-
-	bool bPreview = g_dubOpts.audio.enabled;
-	g_dubOpts.audio.enabled = TRUE;
-
-	VDAVIOutputPreviewSystem outpreview;
-
-	g_project->RunOperation(&outpreview, FALSE, quick_options, iPriority, fProp, 0, 0);
-
-	g_dubOpts.audio.enabled = bPreview;
 }
 
 /////////////////////////////
@@ -480,7 +450,6 @@ public:
 	int mFormat;
 	int mQuality;
 	bool mbQuickCompress;
-	bool bRunAsJob;
 };
 
 VDSaveImageSeqDialogW32::VDSaveImageSeqDialogW32()
@@ -544,7 +513,6 @@ INT_PTR VDSaveImageSeqDialogW32::DlgProc(UINT message, WPARAM wParam, LPARAM lPa
 							: mFormat == AVIOutputImages::kFormatJPEG ? IDC_FORMAT_JPEG
 							: IDC_FORMAT_PNG
 							, BST_CHECKED);
-		CheckDlgButton(mhdlg, IDC_ADD_AS_JOB, bRunAsJob ? BST_CHECKED : BST_UNCHECKED);
 		CheckDlgButton(mhdlg, IDC_QUICK, mbQuickCompress ? BST_CHECKED : BST_UNCHECKED);
 		UpdateFilenames();
 		UpdateEnables();
@@ -634,10 +602,6 @@ INT_PTR VDSaveImageSeqDialogW32::DlgProc(UINT message, WPARAM wParam, LPARAM lPa
 			}
 			return TRUE;
 
-		case IDC_ADD_AS_JOB:
-			bRunAsJob = !!SendMessage((HWND)lParam, BM_GETCHECK, 0, 0);
-			return TRUE;
-
 		case IDC_QUICK:
 			mbQuickCompress = !!SendMessage((HWND)lParam, BM_GETCHECK, 0, 0);
 			return TRUE;
@@ -657,7 +621,6 @@ INT_PTR VDSaveImageSeqDialogW32::DlgProc(UINT message, WPARAM wParam, LPARAM lPa
 }
 
 static const char g_szRegKeyImageSequenceFormat[]="Image sequence: format";
-static const char g_szRegKeyImageSequenceRunAsJob[]="Image sequence: run as job";
 static const char g_szRegKeyImageSequenceQuality[]="Image sequence: quality";
 static const char g_szRegKeyImageSequenceDirectory[]="Image sequence: directory";
 static const char g_szRegKeyImageSequencePrefix[]="Image sequence: prefix";
@@ -665,10 +628,10 @@ static const char g_szRegKeyImageSequenceSuffix[]="Image sequence: suffix";
 static const char g_szRegKeyImageSequenceMinDigits[]="Image sequence: min digits";
 static const char g_szRegKeyImageSequenceQuickCompress[]="Image sequence: quick compress";
 
-void SaveImageSeq(HWND hwnd) {
+void SaveImageSeq(HWND hwnd, bool queueAsJob) {
 	VDSaveImageSeqDialogW32 dlg;
 
-	if (!inputVideoAVI) {
+	if (!inputVideo) {
 		MessageBox(hwnd, "No input video stream to process.", g_szError, MB_OK);
 		return;
 	}
@@ -680,7 +643,6 @@ void SaveImageSeq(HWND hwnd) {
 		dlg.mFormat = AVIOutputImages::kFormatTGA;
 	dlg.mFirstFrame	= 0;
 	dlg.mLastFrame	= g_project->GetFrameCount() - 1;
-	dlg.bRunAsJob	= key.getBool(g_szRegKeyImageSequenceRunAsJob, false);
 	dlg.mQuality	= key.getInt(g_szRegKeyImageSequenceQuality, 95);
 	dlg.mbQuickCompress	= key.getBool(g_szRegKeyImageSequenceQuickCompress, true);
 	dlg.digits		= key.getInt(g_szRegKeyImageSequenceMinDigits, 4);
@@ -698,7 +660,6 @@ void SaveImageSeq(HWND hwnd) {
 
 	if (dlg.ActivateDialogDual((VDGUIHandle)hwnd)) {
 		key.setInt(g_szRegKeyImageSequenceFormat, dlg.mFormat);
-		key.setBool(g_szRegKeyImageSequenceRunAsJob, dlg.bRunAsJob);
 		key.setInt(g_szRegKeyImageSequenceQuality, dlg.mQuality);
 		key.setInt(g_szRegKeyImageSequenceMinDigits, dlg.digits);
 		key.setString(g_szRegKeyImageSequenceDirectory, dlg.mDirectory.c_str());
@@ -711,7 +672,7 @@ void SaveImageSeq(HWND hwnd) {
 		if (dlg.mFormat == AVIOutputImages::kFormatPNG)
 			q = dlg.mbQuickCompress ? 0 : 100;
 
-		if (dlg.bRunAsJob)
+		if (queueAsJob)
 			JobAddConfigurationImages(&g_dubOpts, g_szInputAVIFile, NULL, dlg.mFormatString.c_str(), dlg.mPostfix.c_str(), dlg.digits, dlg.mFormat, q, &inputAVI->listFiles);
 		else
 			SaveImageSequence(dlg.mFormatString.c_str(), dlg.mPostfix.c_str(), dlg.digits, false, NULL, dlg.mFormat, q);

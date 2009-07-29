@@ -17,8 +17,7 @@
 
 #include "stdafx.h"
 
-#include <windows.h>
-#include <commctrl.h>
+#include <vd2/system/memory.h>
 
 #include "resource.h"
 #include "filter.h"
@@ -34,28 +33,101 @@ extern "C" void asm_grayscale_run(
 
 ///////////////////////////////////
 
-int grayscale_run(const FilterActivation *fa, const FilterFunctions *ff) {	
-	asm_grayscale_run(
-			fa->src.data,
-			fa->src.w,
-			fa->src.h,
-			fa->src.pitch
-			);
+#ifndef _M_IX86
+static void grayscale_run_rgb32(const VDXPixmap& pxdst) {
+	uint8 *row = (uint8 *)pxdst.data;
+	ptrdiff_t pitch = pxdst.pitch;
+	uint32 h = pxdst.h;
+	uint32 w = pxdst.w;
+
+	for(uint32 y=0; y<h; ++y) {
+		uint8 *p = row;
+
+		for(uint32 x=0; x<w; ++x) {
+			uint8 y = (((int)p[0] * 19 + (int)p[1]*183 + (int)p[2] * 54) >> 8);
+
+			p[0] = y;
+			p[1] = y;
+			p[2] = y;
+			p += 4;
+		}
+
+		row += pitch;
+	}
+}
+#endif
+
+static void grayscale_run_yuv(const VDXPixmap& pxdst, int xbits, int ybits) {
+	int w = -(-pxdst.w >> xbits);
+	int h = -(-pxdst.h >> ybits);
+
+	VDMemset8Rect(pxdst.data2, pxdst.pitch2, 0x80, w, h);
+	VDMemset8Rect(pxdst.data3, pxdst.pitch3, 0x80, w, h);
+}
+
+static int grayscale_run(const FilterActivation *fa, const FilterFunctions *ff) {
+	const VDXPixmap& pxdst = *fa->dst.mpPixmap;
+
+	switch(pxdst.format) {
+		case nsVDXPixmap::kPixFormat_XRGB8888:
+#ifdef _M_IX86
+			asm_grayscale_run(
+					pxdst.data,
+					pxdst.w,
+					pxdst.h,
+					pxdst.pitch
+					);
+#else
+			grayscale_run_rgb32(pxdst);
+#endif
+			break;
+
+		case nsVDXPixmap::kPixFormat_YUV444_Planar:
+			grayscale_run_yuv(pxdst, 0, 0);
+			break;
+		case nsVDXPixmap::kPixFormat_YUV422_Planar:
+			grayscale_run_yuv(pxdst, 1, 0);
+			break;
+		case nsVDXPixmap::kPixFormat_YUV420_Planar:
+			grayscale_run_yuv(pxdst, 1, 1);
+			break;
+		case nsVDXPixmap::kPixFormat_YUV411_Planar:
+			grayscale_run_yuv(pxdst, 2, 0);
+			break;
+		case nsVDXPixmap::kPixFormat_YUV410_Planar:
+			grayscale_run_yuv(pxdst, 2, 2);
+			break;
+	}
 
 	return 0;
 }
 
-long grayscale_param(FilterActivation *fa, const FilterFunctions *ff) {
-	fa->dst.offset	= fa->src.offset;
-	fa->dst.modulo	= fa->src.modulo;
-	fa->dst.pitch	= fa->src.pitch;
-	return 0;
+static long grayscale_param(FilterActivation *fa, const FilterFunctions *ff) {
+	const VDXPixmapLayout& pxsrc = *fa->src.mpPixmapLayout;
+	switch(pxsrc.format) {
+		case nsVDXPixmap::kPixFormat_XRGB8888:
+		case nsVDXPixmap::kPixFormat_YUV444_Planar:
+		case nsVDXPixmap::kPixFormat_YUV422_Planar:
+		case nsVDXPixmap::kPixFormat_YUV420_Planar:
+		case nsVDXPixmap::kPixFormat_YUV411_Planar:
+		case nsVDXPixmap::kPixFormat_YUV410_Planar:
+			break;
+
+		default:
+			return FILTERPARAM_NOT_SUPPORTED;
+	}
+
+	VDXPixmapLayout& pxdst = *fa->dst.mpPixmapLayout;
+
+	fa->dst.depth = 0;
+	pxdst = pxsrc;
+	return FILTERPARAM_SUPPORTS_ALTFORMATS;
 }
 
 FilterDefinition filterDef_grayscale={
 	0,0,NULL,
 	"grayscale",
-	"Rips the color out of your image.\n\n[Assembly optimized]",
+	"Rips the color out of your image.\n\n[Assembly optimized] [YCbCr processing]",
 	NULL,NULL,
 	0,
 	NULL,NULL,

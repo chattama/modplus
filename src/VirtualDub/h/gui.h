@@ -40,18 +40,20 @@ public:
 
 void guiOpenDebug();
 
-bool guiDlgMessageLoop(HWND hDlg);
+bool guiDlgMessageLoop(HWND hDlg, int *errorCode = NULL);
 bool guiCheckDialogs(LPMSG pMsg);
 void guiAddModelessDialog(ModelessDlgNode *pmdn);
 void VDInstallModelessDialogHookW32();
 void VDDeinstallModelessDialogHookW32();
 
 void VDUISaveWindowPlacementW32(HWND hwnd, const char *name);
-void VDUIRestoreWindowPlacementW32(HWND hwnd, const char *name);
+void VDUIRestoreWindowPlacementW32(HWND hwnd, const char *name, int nCmdShow);
 void VDUISaveListViewColumnsW32(HWND hwnd, const char *name);
 void VDUIRestoreListViewColumnsW32(HWND hwnd, const char *name);
 
 void VDUISetListViewColumnsW32(HWND hwnd, const float *relwidths, int count);
+
+void VDSetDialogDefaultIcons(HWND hdlg);
 
 void guiSetStatus(char *format, int nPart, ...);
 void guiSetTitle(HWND hWnd, UINT uID, ...);

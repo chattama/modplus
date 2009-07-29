@@ -48,6 +48,9 @@
 	typedef sint32				int32;
 	typedef sint16				int16;
 	typedef sint8				int8;
+
+	typedef ptrdiff_t			sintptr;
+	typedef size_t				uintptr;
 #endif
 
 #ifndef VDXAPIENTRY
@@ -71,14 +74,14 @@ enum VDXCPUFeatureFlags {
 };
 
 enum {
-	kVDPlugin_APIVersion		= 10
+	kVDXPlugin_APIVersion		= 10
 };
 
 
 enum {
-	kVDPluginType_Video,		// Updated video filter API is not yet complete.
-	kVDPluginType_Audio,
-	kVDPluginType_Input
+	kVDXPluginType_Video,		// Updated video filter API is not yet complete.
+	kVDXPluginType_Audio,
+	kVDXPluginType_Input
 };
 
 struct VDXPluginInfo {
@@ -111,7 +114,7 @@ public:
 
 typedef IVDXPluginCallbacks IVDPluginCallbacks;
 
-struct VDPluginConfigEntry {
+struct VDXPluginConfigEntry {
 	enum Type {
 		kTypeInvalid	= 0,
 		kTypeU32		= 1,
@@ -124,13 +127,81 @@ struct VDPluginConfigEntry {
 		kTypeBlock
 	};
 
-	const VDPluginConfigEntry *next;
+	const VDXPluginConfigEntry *next;
 
 	unsigned	idx;
 	uint32		type;
 	const wchar_t *name;
 	const wchar_t *label;
 	const wchar_t *desc;	
+};
+
+struct VDXRect {
+	sint32	left;
+	sint32	top;
+	sint32	right;
+	sint32	bottom;
+};
+
+struct VDXPixmap {
+	void			*data;
+	const uint32	*palette;
+	sint32			w;
+	sint32			h;
+	ptrdiff_t		pitch;
+	sint32			format;
+
+	// Auxiliary planes are always byte-per-pixel.
+	void			*data2;		// Cb (U) for YCbCr
+	ptrdiff_t		pitch2;
+	void			*data3;		// Cr (V) for YCbCr
+	ptrdiff_t		pitch3;
+};
+
+struct VDXPixmapLayout {
+	ptrdiff_t		data;
+	const uint32	*palette;
+	sint32			w;
+	sint32			h;
+	ptrdiff_t		pitch;
+	sint32			format;
+
+	// Auxiliary planes are always byte-per-pixel.
+	ptrdiff_t		data2;		// Cb (U) for YCbCr
+	ptrdiff_t		pitch2;
+	ptrdiff_t		data3;		// Cr (V) for YCbCr
+	ptrdiff_t		pitch3;
+};
+
+namespace nsVDXPixmap {
+	enum VDXPixmapFormat {
+		kPixFormat_Null				= 0,
+		kPixFormat_XRGB1555			= 5,
+		kPixFormat_RGB565			= 6,
+		kPixFormat_RGB888			= 7,
+		kPixFormat_XRGB8888			= 8,
+		kPixFormat_Y8				= 9,
+		kPixFormat_YUV422_UYVY		= 10,
+		kPixFormat_YUV422_YUYV		= 11,
+		kPixFormat_YUV444_Planar	= 13,
+		kPixFormat_YUV422_Planar	= 14,
+		kPixFormat_YUV420_Planar	= 15,
+		kPixFormat_YUV411_Planar	= 16,
+		kPixFormat_YUV410_Planar	= 17,
+
+		kPixFormat_VDXA_RGB			= 0x10001,
+		kPixFormat_VDXA_YUV			= 0x10002
+	};
+};
+
+#define VDXMAKEFOURCC(a, b, c, d) ((uint32)(uint8)(d) + ((uint32)(uint8)(c) << 8) + ((uint32)(uint8)(b) << 16) + ((uint32)(uint8)(a) << 24))
+
+class IVDXUnknown {
+public:
+	enum { kIID = VDXMAKEFOURCC('X', 'u', 'n', 'k') };
+	virtual int VDXAPIENTRY AddRef() = 0;
+	virtual int VDXAPIENTRY Release() = 0;
+	virtual void *VDXAPIENTRY AsInterface(uint32 iid) = 0;
 };
 
 #endif

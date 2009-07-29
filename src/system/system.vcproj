@@ -18,8 +18,8 @@
 		/>
 	</Platforms>
 	<ToolFiles>
-		<DefaultToolFile
-			FileName="masm.rules"
+		<ToolFile
+			RelativePath="..\YASM.rules"
 		/>
 	</ToolFiles>
 	<Configurations>
@@ -39,7 +39,7 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
-				Name="MASM"
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -113,7 +113,7 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
-				Name="MASM"
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -188,7 +188,7 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
-				Name="MASM"
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -262,7 +262,7 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
-				Name="MASM"
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -329,6 +329,10 @@
 			Name="Source Files"
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
+			<File
+				RelativePath="..\h\vd2\system\source\bitmath.cpp"
+				>
+			</File>
 			<File
 				RelativePath="source\cache.cpp"
 				>
@@ -658,6 +662,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\filewatcher.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\Fraction.cpp"
 				>
 				<FileConfiguration
@@ -696,6 +704,14 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\halffloat.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\hash.cpp"
+				>
 			</File>
 			<File
 				RelativePath="source\int128.cpp"
@@ -979,6 +995,10 @@
 			</File>
 			<File
 				RelativePath=".\source\protscope.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\refcount.cpp"
 				>
 			</File>
 			<File
@@ -1306,6 +1326,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\vdstl.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\VDString.cpp"
 				>
 				<FileConfiguration
@@ -1479,6 +1503,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\h\vd2\system\bitmath.h"
+				>
+			</File>
+			<File
 				RelativePath="..\h\vd2\system\cache.h"
 				>
 			</File>
@@ -1519,7 +1547,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\h\vd2\system\filewatcher.h"
+				>
+			</File>
+			<File
 				RelativePath="..\h\VD2\system\Fraction.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\system\halffloat.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\system\hash.h"
 				>
 			</File>
 			<File
@@ -1642,6 +1682,14 @@
 				RelativePath="..\h\vd2\system\zip.h"
 				>
 			</File>
+			<Filter
+				Name="win32"
+				>
+				<File
+					RelativePath="..\h\vd2\system\win32\miniwindows.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Assembly Files (x86)"
@@ -1651,31 +1699,11 @@
 				RelativePath="source\a_memory.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1683,9 +1711,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /Zi /coff /nologo /Fo&quot;$(IntDir)\$(InputName).obj&quot; $(InputPath)&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1697,15 +1723,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="MASM"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="MASM"
-						UseSafeExceptionHandlers="false"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1713,7 +1731,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="MASM"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1729,17 +1747,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1747,17 +1755,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1769,17 +1767,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1787,17 +1775,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1809,17 +1787,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -1827,17 +1795,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						Description=""
-						CommandLine="ml64 /c /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1845,6 +1803,48 @@
 		<Filter
 			Name="Precompiled Header Support"
 			>
+			<File
+				RelativePath=".\source\stdaccel.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="3"
+						InlineFunctionExpansion="0"
+						EnableIntrinsicFunctions="false"
+						BasicRuntimeChecks="0"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|x64"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="3"
+						BasicRuntimeChecks="0"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+			</File>
 			<File
 				RelativePath="source\stdafx.cpp"
 				>

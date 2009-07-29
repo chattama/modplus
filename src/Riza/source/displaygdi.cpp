@@ -92,6 +92,9 @@ bool VDVideoDisplayMinidriverGDI::Init(HWND hwnd, const VDVideoDisplaySourceInfo
 	case nsVDPixmap::kPixFormat_YUV411_Planar:
 	case nsVDPixmap::kPixFormat_YUV410_Planar:
 	case nsVDPixmap::kPixFormat_Y8:
+	case nsVDPixmap::kPixFormat_YUV422_V210:
+	case nsVDPixmap::kPixFormat_YUV422_UYVY_709:
+	case nsVDPixmap::kPixFormat_YUV420_NV12:
 		if (!info.bAllowConversion)
 	default:
 			return false;
@@ -188,6 +191,9 @@ bool VDVideoDisplayMinidriverGDI::Init(HWND hwnd, const VDVideoDisplaySourceInfo
 				case nsVDPixmap::kPixFormat_YUV411_Planar:
 				case nsVDPixmap::kPixFormat_YUV410_Planar:
 				case nsVDPixmap::kPixFormat_Y8:
+				case nsVDPixmap::kPixFormat_YUV422_V210:
+				case nsVDPixmap::kPixFormat_YUV422_UYVY_709:
+				case nsVDPixmap::kPixFormat_YUV420_NV12:
 				case nsVDPixmap::kPixFormat_RGB565:
 					switch(mScreenFormat) {
 					case nsVDPixmap::kPixFormat_XRGB1555:
@@ -314,6 +320,9 @@ bool VDVideoDisplayMinidriverGDI::Update(UpdateMode mode) {
 			case nsVDPixmap::kPixFormat_YUV411_Planar:
 			case nsVDPixmap::kPixFormat_YUV410_Planar:
 			case nsVDPixmap::kPixFormat_Y8:
+			case nsVDPixmap::kPixFormat_YUV422_V210:
+			case nsVDPixmap::kPixFormat_YUV422_UYVY_709:
+			case nsVDPixmap::kPixFormat_YUV420_NV12:
 				dstbm.format = mScreenFormat;
 				break;
 			}
@@ -374,6 +383,9 @@ bool VDVideoDisplayMinidriverGDI::SetSubrect(const vdrect32 *r) {
 }
 
 void VDVideoDisplayMinidriverGDI::InternalRefresh(HDC hdc, const RECT& rClient, UpdateMode mode) {
+	if (rClient.right <= 0 || rClient.bottom <= 0)
+		return;
+
 	SetStretchBltMode(hdc, COLORONCOLOR);
 
 	const VDPixmap& source = mSource.pixmap;
@@ -392,11 +404,12 @@ void VDVideoDisplayMinidriverGDI::InternalRefresh(HDC hdc, const RECT& rClient, 
 	}
 
 	if (mSource.bInterlaced) {
+		int fieldMode = mode & kModeFieldMask;
 		uint32 vinc		= (r.height() << 16) / rClient.bottom;
 		uint32 vaccum	= (vinc >> 1) + (r.top << 16);
 		uint32 vtlimit	= (((r.height() + 1) >> 1) << 17) - 1;
-		int fieldbase	= (mode == kModeOddField ? 1 : 0);
-		int ystep		= (mode == kModeAllFields) ? 1 : 2;
+		int fieldbase	= (fieldMode == kModeOddField ? 1 : 0);
+		int ystep		= (fieldMode == kModeAllFields) ? 1 : 2;
 
 		vaccum += vinc*fieldbase;
 		vinc *= ystep;

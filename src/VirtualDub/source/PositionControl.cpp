@@ -115,6 +115,8 @@ protected:
 	void		SetFrameTypeCallback(IVDPositionControlCallback *pCB);
 
 	void		SetRange(VDPosition lo, VDPosition hi, bool updateNow);
+	VDPosition	GetRangeBegin();
+	VDPosition	GetRangeEnd();
 
 	VDPosition	GetPosition();
 	void		SetPosition(VDPosition pos);
@@ -318,6 +320,14 @@ void VDPositionControlW32::SetRange(VDPosition lo, VDPosition hi, bool updateNow
 		RecomputeMetrics();
 		UpdateString();
 	}
+}
+
+VDPosition VDPositionControlW32::GetRangeBegin() {
+	return mRangeStart;
+}
+
+VDPosition VDPositionControlW32::GetRangeEnd() {
+	return mRangeEnd;
 }
 
 VDPosition VDPositionControlW32::GetPosition() {
@@ -700,7 +710,11 @@ LRESULT CALLBACK VDPositionControlW32::WndProc(UINT msg, WPARAM wParam, LPARAM l
 				mWheelAccum -= WHEEL_DELTA * increments;
 
 				SetPosition(mPosition + increments);
-				Notify(PCN_THUMBPOSITION, VDPositionControlEventData::kEventJump);
+
+				if (increments < 0)
+					Notify(PCN_THUMBPOSITIONPREV, VDPositionControlEventData::kEventJump);
+				else
+					Notify(PCN_THUMBPOSITIONNEXT, VDPositionControlEventData::kEventJump);
 			}
 		}
 		return 0;

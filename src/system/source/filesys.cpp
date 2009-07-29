@@ -31,6 +31,7 @@
 #include <vd2/system/filesys.h>
 #include <vd2/system/Error.h>
 #include <vd2/system/vdstl.h>
+#include <vd2/system/w32assist.h>
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -411,6 +412,28 @@ namespace {
 	typedef BOOL (WINAPI *tpGetFullPathNameW)(LPCWSTR lpFileName, DWORD nBufferLength, LPWSTR lpBuffer, LPWSTR *lpFilePart);
 }
 
+uint64 VDFileGetLastWriteTime(const wchar_t *path) {
+	if (VDIsWindowsNT()) {
+		WIN32_FIND_DATAW fdw;
+		HANDLE h = FindFirstFileW(path, &fdw);
+		if (h == INVALID_HANDLE_VALUE)
+			return 0;
+
+		FindClose(h);
+
+		return ((uint64)fdw.ftLastWriteTime.dwHighDateTime << 32) + fdw.ftLastWriteTime.dwLowDateTime;
+	} else {
+		WIN32_FIND_DATAA fda;
+		HANDLE h = FindFirstFileA(VDTextWToA(path).c_str(), &fda);
+		if (h == INVALID_HANDLE_VALUE)
+			return 0;
+
+		FindClose(h);
+
+		return ((uint64)fda.ftLastWriteTime.dwHighDateTime << 32) + fda.ftLastWriteTime.dwLowDateTime;
+	}
+}
+
 VDStringW VDFileGetRootPath(const wchar_t *path) {
 	static tpGetVolumePathNameW spGetVolumePathNameW = (tpGetVolumePathNameW)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetVolumePathNameW");
 	static tpGetFullPathNameW spGetFullPathNameW = (tpGetFullPathNameW)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetFullPathNameW");
@@ -501,29 +524,39 @@ void VDFileFixDirPath(VDStringW& path) {
 	}
 }
 
-VDStringW VDGetProgramPath() {
-	union {
-		wchar_t w[MAX_PATH];
-		char a[MAX_PATH];
-	} buf;
+namespace {
+	VDStringW VDGetModulePathW32(HINSTANCE hInst) {
+		union {
+			wchar_t w[MAX_PATH];
+			char a[MAX_PATH];
+		} buf;
 
-	VDStringW wstr;
+		VDStringW wstr;
 
-	if (VDIsWindowsNT()) {
-		wcscpy(buf.w, L".");
-		if (GetModuleFileNameW(NULL, buf.w, MAX_PATH))
-			*VDFileSplitPath(buf.w) = 0;
-		wstr = buf.w;
-	} else {
-		strcpy(buf.a, ".");
-		if (GetModuleFileNameA(NULL, buf.a, MAX_PATH))
-			*VDFileSplitPath(buf.a) = 0;
-		wstr = VDTextAToW(buf.a, -1);
+		if (VDIsWindowsNT()) {
+			wcscpy(buf.w, L".");
+			if (GetModuleFileNameW(hInst, buf.w, MAX_PATH))
+				*VDFileSplitPath(buf.w) = 0;
+			wstr = buf.w;
+		} else {
+			strcpy(buf.a, ".");
+			if (GetModuleFileNameA(hInst, buf.a, MAX_PATH))
+				*VDFileSplitPath(buf.a) = 0;
+			wstr = VDTextAToW(buf.a, -1);
+		}
+
+		VDStringW wstr2(VDGetFullPath(wstr.c_str()));
+
+		return wstr2;
 	}
+}
 
-	VDStringW wstr2(VDGetFullPath(wstr.c_str()));
+VDStringW VDGetLocalModulePath() {
+	return VDGetModulePathW32(VDGetLocalModuleHandleW32());
+}
 
-	return wstr2;
+VDStringW VDGetProgramPath() {
+	return VDGetModulePathW32(NULL);
 }
 
 ///////////////////////////////////////////////////////////////////////////

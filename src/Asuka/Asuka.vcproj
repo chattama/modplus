@@ -387,7 +387,7 @@
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
 			<File
-				RelativePath=".\res\Asuka.rc"
+				RelativePath=".\source\filecreator.cpp"
 				>
 			</File>
 			<File
@@ -495,6 +495,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\source\maketables.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\mapconv.cpp"
 				>
 				<FileConfiguration
@@ -533,6 +537,10 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\psa.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\source\snapsetup.cpp"
@@ -664,6 +672,10 @@
 			Filter="h;hpp;hxx;hm;inl"
 			>
 			<File
+				RelativePath=".\h\filecreator.h"
+				>
+			</File>
+			<File
 				RelativePath=".\h\glc.h"
 				>
 			</File>
@@ -684,6 +696,10 @@
 			Name="Resource Files"
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
 			>
+			<File
+				RelativePath=".\res\Asuka.rc"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Precompiled Header Files"

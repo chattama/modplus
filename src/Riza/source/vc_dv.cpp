@@ -36,6 +36,7 @@ public:
 	bool SetTargetFormat(const void *format);
 	int GetTargetFormat() { return mFormat; }
 	int GetTargetFormatVariant() { return 0; }
+	const uint32 *GetTargetFormatPalette() { return NULL; }
 	void Start();
 	void Stop();
 	void DecompressFrame(void *dst, const void *src, uint32 srcSize, bool keyframe, bool preroll);
@@ -70,7 +71,7 @@ bool VDVideoDecompressorDV::QueryTargetFormat(int format) {
 }
 
 bool VDVideoDecompressorDV::QueryTargetFormat(const void *format) {
-	const BITMAPINFOHEADER& hdr = *(const BITMAPINFOHEADER *)format;
+	const VDAVIBitmapInfoHeader& hdr = *(const VDAVIBitmapInfoHeader *)format;
 
 	if (hdr.biWidth != mWidth || hdr.biHeight != mHeight)
 		return false;
@@ -93,7 +94,7 @@ bool VDVideoDecompressorDV::SetTargetFormat(int format) {
 }
 
 bool VDVideoDecompressorDV::SetTargetFormat(const void *format) {
-	const BITMAPINFOHEADER& hdr = *(const BITMAPINFOHEADER *)format;
+	const VDAVIBitmapInfoHeader& hdr = *(const VDAVIBitmapInfoHeader *)format;
 
 	if (hdr.biWidth != mWidth || hdr.biHeight != mHeight)
 		return false;

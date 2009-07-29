@@ -18,7 +18,7 @@
 #include "stdafx.h"
 
 #include <vd2/plugin/vdplugin.h>
-#include <vd2/plugin/vdvideofiltold.h>
+#include <vd2/plugin/vdvideofilt.h>
 #include "filters.h"
 #include "f_convolute.h"
 
@@ -192,9 +192,9 @@ static int sharpen_init(FilterActivation *fa, const FilterFunctions *ff) {
 	return 0;
 }
 
-static int sharpen_config(FilterActivation *fa, const FilterFunctions *ff, HWND hWnd) {
+static int sharpen_config(FilterActivation *fa, const FilterFunctions *ff, VDXHWND hWnd) {
 	ConvoluteFilterData *cfd;
-	LONG lv;
+	sint32 lv;
 
 	if (!fa->filter_data) {
 		if (!(fa->filter_data = (void *)new ConvoluteFilterData)) return 0;
@@ -203,7 +203,10 @@ static int sharpen_config(FilterActivation *fa, const FilterFunctions *ff, HWND 
 	}
 	cfd = (ConvoluteFilterData *)fa->filter_data;
 
-	lv = FilterGetSingleValue(hWnd, -cfd->m[0], 0, 64, "sharpen", fa->ifp, sharpen_update, cfd);
+	if (!VDFilterGetSingleValue((HWND)hWnd, -cfd->m[0], &lv, 0, 64, "sharpen", fa->ifp2, sharpen_update, cfd)) {
+		sharpen_update(lv, fa->filter_data);
+		return 1;
+	}
 
 	sharpen_update(lv, fa->filter_data);
 	return 0;

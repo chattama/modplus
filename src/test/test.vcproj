@@ -432,7 +432,19 @@
 				>
 			</File>
 			<File
+				RelativePath=".\source\TestAVIReadIndex.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\source\TestBufferedStream.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestDeque.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestDistributedJobQueue.cpp"
 				>
 			</File>
 			<File
@@ -480,7 +492,15 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\TestHalfFloat.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\source\TestMath.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestPixel.cpp"
 				>
 			</File>
 			<File
@@ -524,7 +544,27 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\TestResampler.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestSpanUtils.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\source\TestString.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestSynchronization.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestUberblit.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\TestUberblitPerf.cpp"
 				>
 			</File>
 			<File

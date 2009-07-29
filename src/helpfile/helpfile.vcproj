@@ -94,6 +94,22 @@
 				RelativePath="source\videofilters.lina"
 				>
 			</File>
+			<Filter
+				Name="render"
+				>
+				<File
+					RelativePath=".\source\render\compression.lina"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="batch"
+				>
+				<File
+					RelativePath=".\source\batch\distributed.lina"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<File
 			RelativePath="Makefile"

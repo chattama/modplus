@@ -94,8 +94,11 @@ public:
 	// The "NT" functions are non-throwing and return success/failure; the regular functions throw exceptions
 	// when something bad happens.
 
-	void	open(const char *pszFileName, uint32 flags = nsVDFile::kRead | nsVDFile::kDenyWrite | nsVDFile::kOpenExisting);	// false if failed due to not found or already exists
-	void	open(const wchar_t *pwszFileName, uint32 flags = nsVDFile::kRead | nsVDFile::kDenyWrite | nsVDFile::kOpenExisting);	// false if failed due to not found or already exists
+	void	open(const char *pszFileName, uint32 flags = nsVDFile::kRead | nsVDFile::kDenyWrite | nsVDFile::kOpenExisting);
+	void	open(const wchar_t *pwszFileName, uint32 flags = nsVDFile::kRead | nsVDFile::kDenyWrite | nsVDFile::kOpenExisting);
+
+	bool	openNT(const wchar_t *pwszFileName, uint32 flags = nsVDFile::kRead | nsVDFile::kDenyWrite | nsVDFile::kOpenExisting);
+
 	bool	closeNT();
 	void	close();
 	bool	truncateNT();
@@ -140,7 +143,7 @@ public:
 	static void FreeUnbuffer(void *p);
 
 protected:
-	void	open_internal(const char *pszFilename, const wchar_t *pwszFilename, uint32 flags);
+	bool	open_internal(const char *pszFilename, const wchar_t *pwszFilename, uint32 flags, bool throwOnError);
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -181,6 +184,7 @@ public:
 	virtual sint64	Pos() = 0;
 	virtual void	Read(void *buffer, sint32 bytes) = 0;
 	virtual sint32	ReadData(void *buffer, sint32 bytes) = 0;
+	virtual void	Write(const void *buffer, sint32 bytes) = 0;
 };
 
 class IVDRandomAccessStream : public IVDStream {
@@ -207,6 +211,7 @@ public:
 	sint64	Pos();
 	void	Read(void *buffer, sint32 bytes);
 	sint32	ReadData(void *buffer, sint32 bytes);
+	void	Write(const void *buffer, sint32 bytes);
 	sint64	Length();
 	void	Seek(sint64 offset);
 };
@@ -219,6 +224,7 @@ public:
 	sint64	Pos();
 	void	Read(void *buffer, sint32 bytes);
 	sint32	ReadData(void *buffer, sint32 bytes);
+	void	Write(const void *buffer, sint32 bytes);
 	sint64	Length();
 	void	Seek(sint64 offset);
 
@@ -237,6 +243,7 @@ public:
 	sint64	Pos();
 	void	Read(void *buffer, sint32 bytes);
 	sint32	ReadData(void *buffer, sint32 bytes);
+	void	Write(const void *buffer, sint32 bytes);
 
 	sint64	Length();
 	void	Seek(sint64 offset);
@@ -290,13 +297,15 @@ protected:
 	VDTextStream	mTextStream;
 };
 
-class VDTextOutputFile {
+class VDTextOutputStream {
 public:
-	VDTextOutputFile(const wchar_t *filename, uint32 flags = nsVDFile::kCreateAlways);
-	~VDTextOutputFile();
+	VDTextOutputStream(IVDStream *stream);
+	~VDTextOutputStream();
 
-	void Close();
+	void Flush();
 
+	void Write(const char *s, int len);
+	void PutLine();
 	void PutLine(const char *s);
 	void FormatLine(const char *format, ...);
 
@@ -307,7 +316,7 @@ protected:
 	enum { kBufSize = 4096 };
 
 	int			mLevel;
-	VDFile		mFile;
+	IVDStream	*mpDst;
 	char		mBuf[kBufSize];
 };
 

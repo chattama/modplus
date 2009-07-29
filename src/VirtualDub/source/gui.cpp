@@ -137,12 +137,15 @@ void guiOpenDebug() {
 
 ////////////////////////////////////////////////////////////////////////////
 
-bool guiDlgMessageLoop(HWND hDlg) {
+bool guiDlgMessageLoop(HWND hDlg, int *errorCode) {
 	MSG msg;
 
 	while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-		if (msg.message == WM_QUIT)
+		if (msg.message == WM_QUIT) {
+			if (errorCode)
+				*errorCode = msg.wParam;
 			return false;
+		}
 
 		if (!hDlg || !IsWindow(hDlg) || !IsDialogMessage(hDlg, &msg)) {
 			TranslateMessage(&msg);
@@ -214,28 +217,58 @@ void VDInstallModelessDialogHookW32() {
 		g_vdModelessDialogHook = SetWindowsHookEx(WH_MSGFILTER, VDModelessDialogHookW32, NULL, GetCurrentThreadId());
 }
 
+namespace {
+	struct VDUISavedWindowPlacement {
+		sint32 mLeft;
+		sint32 mTop;
+		sint32 mRight;
+		sint32 mBottom;
+		uint8 mbMaximized;
+		uint8 mPad[3];
+	};
+}
+
 void VDUISaveWindowPlacementW32(HWND hwnd, const char *name) {
 	VDRegistryAppKey key("Window Placement");
 
 	WINDOWPLACEMENT wp = {sizeof(WINDOWPLACEMENT)};
 
-	if (GetWindowPlacement(hwnd, &wp))
-		key.setBinary(name, (const char *)&wp.rcNormalPosition, sizeof(RECT));
+	if (GetWindowPlacement(hwnd, &wp)) {
+		VDUISavedWindowPlacement sp = {0};
+		sp.mLeft	= wp.rcNormalPosition.left;
+		sp.mTop		= wp.rcNormalPosition.top;
+		sp.mRight	= wp.rcNormalPosition.right;
+		sp.mBottom	= wp.rcNormalPosition.bottom;
+		sp.mbMaximized = (wp.showCmd == SW_MAXIMIZE);
+		key.setBinary(name, (const char *)&sp, sizeof sp);
+	}
 }
 
-void VDUIRestoreWindowPlacementW32(HWND hwnd, const char *name) {
+void VDUIRestoreWindowPlacementW32(HWND hwnd, const char *name, int nCmdShow) {
 	if (!IsZoomed(hwnd) && !IsIconic(hwnd)) {
 		VDRegistryAppKey key("Window Placement");
-		RECT r;
+		VDUISavedWindowPlacement sp = {0};
 
-		if (key.getBinaryLength(name) == sizeof(r) && key.getBinary(name, (char *)&r, sizeof r)) {
+		// Earlier versions only saved a RECT.
+		int len = key.getBinaryLength(name);
+
+		if (len > (int)sizeof(VDUISavedWindowPlacement))
+			len = sizeof(VDUISavedWindowPlacement);
+
+		if (len >= offsetof(VDUISavedWindowPlacement, mbMaximized) && key.getBinary(name, (char *)&sp, len)) {
 			WINDOWPLACEMENT wp = {sizeof(WINDOWPLACEMENT)};
 
 			if (GetWindowPlacement(hwnd, &wp)) {
 				wp.length			= sizeof(WINDOWPLACEMENT);
 				wp.flags			= 0;
-				wp.showCmd			= SW_SHOWNORMAL;
-				wp.rcNormalPosition	= r;
+				wp.showCmd			= nCmdShow;
+				wp.rcNormalPosition.left = sp.mLeft;
+				wp.rcNormalPosition.top = sp.mTop;
+				wp.rcNormalPosition.right = sp.mRight;
+				wp.rcNormalPosition.bottom = sp.mBottom;
+
+				if ((wp.showCmd == SW_SHOW || wp.showCmd == SW_SHOWNORMAL || wp.showCmd == SW_SHOWDEFAULT) && sp.mbMaximized)
+					wp.showCmd = SW_SHOWMAXIMIZED;
 
 				SetWindowPlacement(hwnd, &wp);
 			}
@@ -311,6 +344,18 @@ void VDUISetListViewColumnsW32(HWND hwnd, const float *relwidths, int count) {
 	}
 }
 
+void VDSetDialogDefaultIcons(HWND hdlg) {
+	HINSTANCE hInst = VDGetLocalModuleHandleW32();
+
+	HANDLE hLargeIcon = LoadImage(hInst, MAKEINTRESOURCE(IDI_VIRTUALDUB), IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_SHARED);
+	if (hLargeIcon)
+		SendMessage(hdlg, WM_SETICON, ICON_BIG, (LPARAM)hLargeIcon);
+
+	HANDLE hSmallIcon = LoadImage(hInst, MAKEINTRESOURCE(IDI_VIRTUALDUB), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+	if (hSmallIcon)
+		SendMessage(hdlg, WM_SETICON, ICON_SMALL, (LPARAM)hSmallIcon);
+}
+
 void guiSetStatus(char *format, int nPart, ...) {
 	char buf[1024];
 	va_list val;
@@ -346,7 +391,7 @@ void guiSetTitleW(HWND hWnd, UINT uID, ...) {
 	wchar_t buf2[256];
 	va_list val;
 
-	VDStringW s(VDLoadStringW32(uID));
+	VDStringW s(VDLoadStringW32(uID, true));
 
 	va_start(val, uID);
 	vswprintf(buf2, 256, s.c_str(), val);
@@ -419,14 +464,15 @@ void guiSubclassWindow(HWND hwnd, WNDPROC newproc) {
 
 ///////////////////////////////////////
 
-extern vdrefptr<VideoSource> inputVideoAVI;
+extern vdrefptr<IVDVideoSource> inputVideo;
 
 void guiPositionInitFromStream(IVDPositionControl *pc) {
-	if (!inputVideoAVI) return;
+	if (!inputVideo) return;
 
-	const VDFraction videoRate(inputVideoAVI->getRate());
+	IVDStreamSource *pVSS = inputVideo->asStream();
+	const VDFraction videoRate(pVSS->getRate());
 
-	pc->SetRange(inputVideoAVI->getStart(), inputVideoAVI->getEnd());
+	pc->SetRange(pVSS->getStart(), pVSS->getEnd());
 	pc->SetFrameRate(videoRate);
 }
 
@@ -486,17 +532,19 @@ bool VDHandleTimelineCommand(IVDPositionControl *pc, VDTimeline *pTimeline, UINT
 }
 
 VDPosition guiPositionHandleCommand(WPARAM wParam, IVDPositionControl *pc) {
-	if (!inputVideoAVI) return -1;
+	if (!inputVideo)
+		return -1;
 
+	IVDStreamSource *pVSS = inputVideo->asStream();
 	switch(HIWORD(wParam)) {
 		case PCN_START:
-			pc->SetPosition(inputVideoAVI->getStart());
-			return inputVideoAVI->getStart();
+			pc->SetPosition(pVSS->getStart());
+			return pVSS->getStart();
 		case PCN_BACKWARD:
 			{
 				VDPosition pos = pc->GetPosition();
 
-				if (pos > inputVideoAVI->getStart()) {
+				if (pos > pVSS->getStart()) {
 					pc->SetPosition(pos - 1);
 					return pos - 1;
 				}
@@ -506,21 +554,21 @@ VDPosition guiPositionHandleCommand(WPARAM wParam, IVDPositionControl *pc) {
 			{
 				VDPosition pos = pc->GetPosition();
 
-				if (pos < inputVideoAVI->getEnd()) {
+				if (pos < pVSS->getEnd()) {
 					pc->SetPosition(pos + 1);
 					return pos + 1;
 				}
 			}
 			break;
 		case PCN_END:
-			pc->SetPosition(inputVideoAVI->getEnd());
-			return inputVideoAVI->getEnd();
+			pc->SetPosition(pVSS->getEnd());
+			return pVSS->getEnd();
 
 		case PCN_KEYPREV:
 			{
-				VDPosition lSample = inputVideoAVI->prevKey(pc->GetPosition());
+				VDPosition lSample = inputVideo->prevKey(pc->GetPosition());
 
-				if (lSample < 0) lSample = inputVideoAVI->getStart();
+				if (lSample < 0) lSample = pVSS->getStart();
 
 				pc->SetPosition(lSample);
 				return lSample;
@@ -528,9 +576,9 @@ VDPosition guiPositionHandleCommand(WPARAM wParam, IVDPositionControl *pc) {
 			break;
 		case PCN_KEYNEXT:
 			{
-				VDPosition lSample = inputVideoAVI->nextKey(pc->GetPosition());
+				VDPosition lSample = inputVideo->nextKey(pc->GetPosition());
 
-				if (lSample < 0) lSample = inputVideoAVI->getEnd();
+				if (lSample < 0) lSample = pVSS->getEnd();
 
 				pc->SetPosition(lSample);
 				return lSample;
@@ -547,10 +595,12 @@ VDPosition guiPositionHandleNotify(LPARAM lParam, IVDPositionControl *pc) {
 	switch(nmh->code) {
 	case PCN_THUMBTRACK:
 	case PCN_THUMBPOSITION:
+	case PCN_THUMBPOSITIONPREV:
+	case PCN_THUMBPOSITIONNEXT:
 	case PCN_PAGELEFT:
 	case PCN_PAGERIGHT:
 	case CCN_REFRESHFRAME:
-		if (inputVideoAVI)
+		if (inputVideo)
 			return pc->GetPosition();
 
 		break;
@@ -564,16 +614,17 @@ void guiPositionBlit(HWND hWndClipping, VDPosition lFrame, int w, int h) {
 	try {
 		BITMAPINFOHEADER *dcf;
 
-		if (!inputVideoAVI)
+		if (!inputVideo)
 			SendMessage(hWndClipping, CCM_BLITFRAME2, 0, (LPARAM)NULL);
 		else {
-			dcf = inputVideoAVI->getDecompressedFormat();
+			dcf = (BITMAPINFOHEADER *)inputVideo->getDecompressedFormat();
 
-			if (lFrame < inputVideoAVI->getStart() || lFrame >= inputVideoAVI->getEnd())
+			IVDStreamSource *pVSS = inputVideo->asStream();
+			if (lFrame < pVSS->getStart() || lFrame >= pVSS->getEnd())
 				SendMessage(hWndClipping, CCM_BLITFRAME2, 0, (LPARAM)NULL);
 			else {
 				Pixel32 *tmpmem;
-				const void *pFrame = inputVideoAVI->getFrame(lFrame);
+				const void *pFrame = inputVideo->getFrame(lFrame);
 
 				int dch = abs(dcf->biHeight);
 
@@ -591,7 +642,7 @@ void guiPositionBlit(HWND hWndClipping, VDPosition lFrame, int w, int h) {
 
 					delete[] tmpmem;
 				} else
-					SendMessage(hWndClipping, CCM_BLITFRAME2, 0, (LPARAM)&inputVideoAVI->getTargetFormat());
+					SendMessage(hWndClipping, CCM_BLITFRAME2, 0, (LPARAM)&inputVideo->getTargetFormat());
 			}
 		}
 

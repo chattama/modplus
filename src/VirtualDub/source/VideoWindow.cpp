@@ -23,6 +23,7 @@
 
 #include <windows.h>
 
+#include <vd2/system/fraction.h>
 #include <vd2/system/vdtypes.h>
 #include <vd2/system/w32assist.h>
 #include <vd2/Riza/display.h>
@@ -38,7 +39,7 @@ static LRESULT APIENTRY VideoWindowWndProc(HWND hWnd, UINT msg, WPARAM wParam, L
 
 ////////////////////////////
 
-extern const char g_szVideoWindowClass[]="phaeronVideoWindow";
+extern const char g_szVideoWindowClass[]="VDVideoWindow";
 
 ////////////////////////////
 
@@ -49,26 +50,36 @@ public:
 
 	static ATOM RegisterControl();
 
+	void GetSourceSize(int& w, int& h);
 	void SetSourceSize(int w, int h);
 	void GetFrameSize(int& w, int& h);
 	void Resize();
 	void SetChild(HWND hwnd);
 	void SetDisplay(IVDVideoDisplay *pDisplay);
+	const VDFraction GetSourcePAR();
+	void SetSourcePAR(const VDFraction& fr);
+	void SetResizeParentEnabled(bool enabled);
+	double GetMaxZoomForArea(int w, int h);
 
 private:
 	HWND mhwnd;
 	HWND mhwndChild;
 	HMENU mhmenu;
+	int	mInhibitParamUpdateLocks;
 	int mSourceWidth;
 	int mSourceHeight;
+	VDFraction mSourcePARFrac;
+	double mSourcePAR;
 	double mSourceAspectRatio;
 	double mZoom;
 	double mAspectRatio;
 	double mFreeAspectRatio;
 	bool mbAspectIsFrameBased;
+	bool mbUseSourcePAR;
 	bool mbResizing;
 
 	IVDVideoDisplay *mpDisplay;
+	VDStringW	mSourcePARTextPattern;
 
 	LRESULT mLastHitTest;
 
@@ -83,7 +94,10 @@ private:
 	void OnContextMenu(int x, int y);
 
 	void SetAspectRatio(double ar, bool bFrame);
+	void SetAspectRatioSourcePAR();
 	void SetZoom(double zoom);
+
+	void UpdateSourcePARMenuItem();
 };
 
 ////////////////////////////
@@ -100,17 +114,23 @@ VDVideoWindow::VDVideoWindow(HWND hwnd)
 	: mhwnd(hwnd)
 	, mhwndChild(NULL)
 	, mhmenu(LoadMenu(g_hInst, MAKEINTRESOURCE(IDR_DISPLAY_MENU)))
+	, mInhibitParamUpdateLocks(0)
 	, mSourceWidth(0)
 	, mSourceHeight(0)
+	, mSourcePAR(0.0)
 	, mSourceAspectRatio(1.0)
 	, mZoom(1.0f)
 	, mAspectRatio(-1)
 	, mFreeAspectRatio(1.0)
 	, mLastHitTest(HTNOWHERE)
+	, mbUseSourcePAR(false)
 	, mbResizing(false)
 	, mpDisplay(NULL)
 {
 	SetWindowLongPtr(mhwnd, 0, (LONG_PTR)this);
+
+	mSourcePARTextPattern = VDGetMenuItemTextByCommandW32(mhmenu, ID_DISPLAY_AR_PIXEL_SOURCE);
+	UpdateSourcePARMenuItem();
 }
 
 VDVideoWindow::~VDVideoWindow() {
@@ -135,6 +155,11 @@ ATOM VDVideoWindow::RegisterControl() {
 	return RegisterClass(&wc);
 }
 
+void VDVideoWindow::GetSourceSize(int& w, int& h) {
+	w = mSourceWidth;
+	h = mSourceHeight;
+}
+
 void VDVideoWindow::SetSourceSize(int w, int h) {
 	mSourceWidth		= w;
 	mSourceHeight		= h;
@@ -156,6 +181,7 @@ void VDVideoWindow::GetFrameSize(int& w, int& h) {
 void VDVideoWindow::SetAspectRatio(double ar, bool bFrame) {
 	mAspectRatio = ar;
 	mbAspectIsFrameBased = bFrame;
+	mbUseSourcePAR = false;
 
 	if (ar > 0) {
 		if (bFrame)
@@ -167,16 +193,64 @@ void VDVideoWindow::SetAspectRatio(double ar, bool bFrame) {
 	Resize();
 }
 
+void VDVideoWindow::SetAspectRatioSourcePAR() {
+	mAspectRatio = -1;
+	mbAspectIsFrameBased = false;
+	mbUseSourcePAR = true;
+
+	mFreeAspectRatio = mSourcePAR > 0 ? mSourcePAR : 1.0;
+
+	Resize();
+}
+
 void VDVideoWindow::SetZoom(double zoom) {
 	mZoom = zoom;
 	Resize();
+}
+
+double VDVideoWindow::GetMaxZoomForArea(int w, int h) {
+	double frameAspect;
+
+	w -= 8;
+	if (w <= 0)
+		return 0;
+
+	h -= 8;
+	if (h <= 0)
+		return 0;
+
+	if (mbUseSourcePAR) {
+		double par = 1.0;
+		if (mSourcePAR > 0)
+			par = mSourcePAR;
+
+		if (mSourceHeight > 0)
+			frameAspect = par * (double)mSourceWidth / (double)mSourceHeight;
+		else
+			frameAspect = par;
+	} else if (mAspectRatio < 0) {
+		frameAspect = mFreeAspectRatio * mSourceAspectRatio;
+	} else {
+		frameAspect = mAspectRatio;
+
+		if (!mbAspectIsFrameBased)
+			frameAspect *= mSourceAspectRatio;
+	}
+
+	return std::min<double>((double)w / ((double)mSourceHeight * frameAspect), (double)h / (double)mSourceHeight);
 }
 
 void VDVideoWindow::Resize() {
 	if (mSourceWidth > 0 && mSourceHeight > 0) {
 		int w, h;
 
-		if (mAspectRatio < 0) {
+		if (mbUseSourcePAR) {
+			double ratio = 1.0;
+			if (mSourcePAR > 0)
+				ratio = mSourcePAR;
+
+			w = VDRoundToInt(mSourceHeight * mSourceAspectRatio * ratio * mZoom);
+		} else if (mAspectRatio < 0) {
 			w = VDRoundToInt(mSourceHeight * mSourceAspectRatio * mFreeAspectRatio * mZoom);
 		} else {
 			if (mbAspectIsFrameBased)
@@ -185,7 +259,15 @@ void VDVideoWindow::Resize() {
 				w = VDRoundToInt(mSourceWidth * mAspectRatio * mZoom);
 		}
 		h = VDRoundToInt(mSourceHeight * mZoom);
+
+		if (w < 1)
+			w = 1;
+		if (h < 1)
+			h = 1;
+
+		++mInhibitParamUpdateLocks;
 		SetWindowPos(mhwnd, NULL, 0, 0, w+8, h+8, SWP_NOZORDER|SWP_NOMOVE|SWP_NOACTIVATE);
+		--mInhibitParamUpdateLocks;
 	}
 }
 
@@ -195,6 +277,18 @@ void VDVideoWindow::SetChild(HWND hwnd) {
 
 void VDVideoWindow::SetDisplay(IVDVideoDisplay *pDisplay) {
 	mpDisplay = pDisplay;
+}
+
+const VDFraction VDVideoWindow::GetSourcePAR() {
+	return mSourcePARFrac;
+}
+
+void VDVideoWindow::SetSourcePAR(const VDFraction& fr) {
+	mSourcePAR = 0;
+	if (fr.getLo())
+		mSourcePAR = fr.asDouble();
+	mSourcePARFrac = fr;
+	UpdateSourcePARMenuItem();
 }
 
 LRESULT CALLBACK VDVideoWindow::WndProcStatic(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -271,8 +365,8 @@ LRESULT VDVideoWindow::WndProc(UINT msg, WPARAM wParam, LPARAM lParam) {
 			WINDOWPOS *pwp = ((WINDOWPOS *)lParam);
 			pwp->flags |= SWP_NOZORDER;
 
-			if (mAspectRatio > 0) {
-				double ar = mAspectRatio;
+			if (mAspectRatio > 0 || mbUseSourcePAR) {
+				double ar = mbUseSourcePAR ? mSourcePAR > 0 ? mSourcePAR : 1.0 : mAspectRatio;
 
 				if (!mbAspectIsFrameBased)
 					ar *= (double)mSourceWidth / (double)mSourceHeight;
@@ -298,10 +392,10 @@ LRESULT VDVideoWindow::WndProc(UINT msg, WPARAM wParam, LPARAM lParam) {
 
 			GetClientRect(mhwnd, &r);
 
-			if (mSourceHeight > 0) {
+			if (mSourceHeight > 0 && !mInhibitParamUpdateLocks) {
 				mZoom = (double)r.bottom / mSourceHeight;
 
-				if (mAspectRatio < 0)
+				if (mAspectRatio < 0 && !mbUseSourcePAR && r.right && r.bottom)
 					mFreeAspectRatio = r.right / (r.bottom * mSourceAspectRatio);
 			}
 
@@ -322,6 +416,19 @@ LRESULT VDVideoWindow::WndProc(UINT msg, WPARAM wParam, LPARAM lParam) {
 	case WM_COMMAND:
 		OnCommand(LOWORD(wParam));
 		break;
+
+	case WM_GETMINMAXINFO:
+		{
+			MINMAXINFO& mmi = *(MINMAXINFO *)lParam;
+			DefWindowProc(mhwnd, msg, wParam, lParam);
+
+			if (mmi.ptMinTrackSize.x < 9)
+				mmi.ptMinTrackSize.x = 9;
+
+			if (mmi.ptMinTrackSize.y < 9)
+				mmi.ptMinTrackSize.y = 9;
+		}
+		return 0;
 	}
 
 	return DefWindowProc(mhwnd, msg, wParam, lParam);
@@ -431,6 +538,8 @@ LRESULT VDVideoWindow::HitTest(int x, int y) {
 
 void VDVideoWindow::OnCommand(int cmd) {
 	switch(cmd) {
+	case ID_DISPLAY_ZOOM_6:			SetZoom(0.0625); break;
+	case ID_DISPLAY_ZOOM_12:		SetZoom(0.125); break;
 	case ID_DISPLAY_ZOOM_25:		SetZoom(0.25); break;
 	case ID_DISPLAY_ZOOM_33:		SetZoom(1.0/3.0); break;
 	case ID_DISPLAY_ZOOM_50:		SetZoom(0.5); break;
@@ -446,6 +555,7 @@ void VDVideoWindow::OnCommand(int cmd) {
 		SetAspectRatio(1.0, false);
 		break;
 	case ID_DISPLAY_AR_FREE:		SetAspectRatio(-1, false); break;
+	case ID_DISPLAY_AR_PIXEL_SOURCE: SetAspectRatioSourcePAR(); break;
 	case ID_DISPLAY_AR_PIXEL_0909:  SetAspectRatio( 10.0/11.0, false); break;
 	case ID_DISPLAY_AR_PIXEL_1000:	SetAspectRatio(  1.0     , false); break;
 	case ID_DISPLAY_AR_PIXEL_1093:  SetAspectRatio( 59.0/54.0, false); break;
@@ -480,6 +590,8 @@ void VDVideoWindow::OnCommand(int cmd) {
 void VDVideoWindow::OnContextMenu(int x, int y) {
 	HMENU hmenu = GetSubMenu(mhmenu, 0);
 
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_25, fabs(mZoom - 0.0625) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_25, fabs(mZoom - 0.125) < 1e-5);
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_25, fabs(mZoom - 0.25) < 1e-5);
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_33, fabs(mZoom - 1.0/3.0) < 1e-5);
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_50, fabs(mZoom - 0.5) < 1e-5);
@@ -490,35 +602,37 @@ void VDVideoWindow::OnContextMenu(int x, int y) {
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_200, fabs(mZoom - 2.0) < 1e-5);
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_300, fabs(mZoom - 3.0) < 1e-5);
 	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_ZOOM_400, fabs(mZoom - 4.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FREE, mAspectRatio < 0);
+
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_SOURCE, mbUseSourcePAR);
+
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FREE, !mbUseSourcePAR && mAspectRatio < 0);
 
 	// The aspect ratio values below come from "mir DMG: Aspect Ratios and Frame Sizes",
 	// http://www.mir.com/DMG/aspect.html, as seen on 09/02/2004.
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_0909, !mbAspectIsFrameBased && fabs(mAspectRatio - 10.0/11.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1000, !mbAspectIsFrameBased && fabs(mAspectRatio -  1.0     ) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1093, !mbAspectIsFrameBased && fabs(mAspectRatio - 59.0/54.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1212, !mbAspectIsFrameBased && fabs(mAspectRatio - 40.0/33.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1364, !mbAspectIsFrameBased && fabs(mAspectRatio - 15.0/11.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1457, !mbAspectIsFrameBased && fabs(mAspectRatio -118.0/81.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1639, !mbAspectIsFrameBased && fabs(mAspectRatio - 59.0/36.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1818, !mbAspectIsFrameBased && fabs(mAspectRatio - 20.0/11.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_2185, !mbAspectIsFrameBased && fabs(mAspectRatio - 59.0/27.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1333,  mbAspectIsFrameBased && fabs(mAspectRatio -  4.0/ 3.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1364,  mbAspectIsFrameBased && fabs(mAspectRatio - 15.0/11.0) < 1e-5);
-	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1777,  mbAspectIsFrameBased && fabs(mAspectRatio - 16.0/ 9.0) < 1e-5);
+	bool explicitFrame = !mbUseSourcePAR && mbAspectIsFrameBased;
+	bool explicitPixel = !mbUseSourcePAR && !mbAspectIsFrameBased;
+
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_0909, explicitPixel && fabs(mAspectRatio - 10.0/11.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1000, explicitPixel && fabs(mAspectRatio -  1.0     ) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1093, explicitPixel && fabs(mAspectRatio - 59.0/54.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1212, explicitPixel && fabs(mAspectRatio - 40.0/33.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1364, explicitPixel && fabs(mAspectRatio - 15.0/11.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1457, explicitPixel && fabs(mAspectRatio -118.0/81.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1639, explicitPixel && fabs(mAspectRatio - 59.0/36.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_1818, explicitPixel && fabs(mAspectRatio - 20.0/11.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_PIXEL_2185, explicitPixel && fabs(mAspectRatio - 59.0/27.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1333, explicitFrame && fabs(mAspectRatio -  4.0/ 3.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1364, explicitFrame && fabs(mAspectRatio - 15.0/11.0) < 1e-5);
+	VDCheckMenuItemByCommandW32(hmenu, ID_DISPLAY_AR_FRAME_1777, explicitFrame && fabs(mAspectRatio - 16.0/ 9.0) < 1e-5);
 
 	DWORD dwEnabled1 = MF_BYCOMMAND | MF_GRAYED;
-	DWORD dwEnabled2 = MF_BYCOMMAND | MF_GRAYED;
 	if (mpDisplay && !(g_prefs.fDisplay & Preferences::kDisplayDisableDX)) {
 		if (g_prefs.fDisplay & (Preferences::kDisplayEnableD3D | Preferences::kDisplayEnableOpenGL))
 			dwEnabled1 = MF_BYCOMMAND | MF_ENABLED;
-
-		if (g_prefs.fDisplay & Preferences::kDisplayEnableD3D)
-			dwEnabled2 = MF_BYCOMMAND | MF_ENABLED;
 	}
 	EnableMenuItem(hmenu, ID_DISPLAY_FILTER_POINT, dwEnabled1);
 	EnableMenuItem(hmenu, ID_DISPLAY_FILTER_BILINEAR, dwEnabled1);
-	EnableMenuItem(hmenu, ID_DISPLAY_FILTER_BICUBIC, dwEnabled2);
+	EnableMenuItem(hmenu, ID_DISPLAY_FILTER_BICUBIC, dwEnabled1);
 	EnableMenuItem(hmenu, ID_DISPLAY_FILTER_ANY, dwEnabled1);
 
 	if (mpDisplay) {
@@ -531,4 +645,21 @@ void VDVideoWindow::OnContextMenu(int x, int y) {
 	}
 
 	TrackPopupMenu(hmenu, TPM_LEFTALIGN|TPM_TOPALIGN|TPM_LEFTBUTTON, x, y, 0, mhwnd, NULL);
+}
+
+void VDVideoWindow::UpdateSourcePARMenuItem() {
+	VDStringW s;
+
+	if (mSourcePAR <= 0)
+		s = L"Unknown ratio";
+	else
+		s.sprintf(L"%.4g:1 pixel", mSourcePAR);
+
+	VDStringW t(mSourcePARTextPattern);
+	VDStringW::size_type pos = t.find('?');
+
+	if (pos != VDStringW::npos)
+		t.replace(pos, 1, s.data(), s.size());
+	
+	VDSetMenuItemTextByCommandW32(mhmenu, ID_DISPLAY_AR_PIXEL_SOURCE, t.c_str());
 }

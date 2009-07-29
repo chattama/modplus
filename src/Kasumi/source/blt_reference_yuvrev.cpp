@@ -1,8 +1,13 @@
+#include <vd2/system/cpuaccel.h>
 #include <vd2/system/vdtypes.h>
 #include <vd2/system/vdstl.h>
 #include <vd2/Kasumi/pixmap.h>
 #include <vd2/Kasumi/pixmaputils.h>
 #include "blt_spanutils.h"
+
+#ifdef _M_IX86
+	#include "blt_spanutils_x86.h"
+#endif
 
 using namespace nsVDPixmapSpanUtils;
 
@@ -342,11 +347,36 @@ void VDPixmapBlt_YUVPlanar_encode_reference(const VDPixmap& dstbm, const VDPixma
 		w2 = (w2+1) >> 1;
 		break;
 
+	case nsVDPixmap::kPixFormat_YUV422_Planar_Centered:
+		if (halfchroma) {
+			chroma_srcw = (chroma_srcw + 1) >> 1;
+			hfunc = horiz_realign_to_centered;
+		} else
+			hfunc = horiz_compress2x_centered;
+
+		w2 = (w2+1) >> 1;
+		break;
+
 	case nsVDPixmap::kPixFormat_YUV420_Planar:
 		if (halfchroma)
 			chroma_srcw = (chroma_srcw + 1) >> 1;
 		else
 			hfunc = horiz_compress2x_coaligned;
+
+		vfunc = vert_compress2x_centered;
+		winstep = 2;
+		winposnext = 2;
+		winsize = 4;
+		h2 = (h+1) >> 1;
+		w2 = (w2+1) >> 1;
+		break;
+
+	case nsVDPixmap::kPixFormat_YUV420_Planar_Centered:
+		if (halfchroma) {
+			chroma_srcw = (chroma_srcw + 1) >> 1;
+			hfunc = horiz_realign_to_centered;
+		} else
+			hfunc = horiz_compress2x_centered;
 
 		vfunc = vert_compress2x_centered;
 		winstep = 2;
@@ -379,6 +409,15 @@ void VDPixmapBlt_YUVPlanar_encode_reference(const VDPixmap& dstbm, const VDPixma
 		w2 = (w2+3) >> 2;
 		break;
 	}
+
+#ifdef _M_IX86
+	uint32 cpuflags = CPUGetEnabledExtensions();
+
+	if (cpuflags & CPUF_SUPPORTS_INTEGER_SSE) {
+		if (hfunc == horiz_expand2x_coaligned)
+			hfunc = horiz_expand2x_coaligned_ISSE;
+	}
+#endif
 
 	const uint8 *src = (const uint8 *)srcbm.data;
 	const ptrdiff_t srcpitch = srcbm.pitch;
@@ -482,4 +521,10 @@ void VDPixmapBlt_YUVPlanar_encode_reference(const VDPixmap& dstbm, const VDPixma
 			crdst += crdstpitch;
 		} while(--h2);
 	}
+
+#ifdef _M_IX86
+	if (cpuflags & CPUF_SUPPORTS_MMX) {
+		__asm emms
+	}
+#endif
 }

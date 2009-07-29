@@ -46,16 +46,20 @@ public:
 	};
 
 	enum FieldMode {
-		kEvenFieldOnly		= 0x01,
-		kOddFieldOnly		= 0x02,
-		kAllFields			= 0x03,
-		kVSync				= 0x04,
-		kFirstField			= 0x08,
+		kEvenFieldOnly		= 0x0001,
+		kOddFieldOnly		= 0x0002,
+		kAllFields			= 0x0003,
+		kVSync				= 0x0004,
+		kFirstField			= 0x0008,
 
-		kVisibleOnly		= 0x40,
-		kAutoFlipFields		= 0x80,
+		kDoNotCache			= 0x0020,
+		kVisibleOnly		= 0x0040,
+		kAutoFlipFields		= 0x0080,
+		kBobEven			= 0x0100,
+		kBobOdd				= 0x0200,
+		kSequentialFields	= 0x0400,
 
-		kFieldModeMax		= 255
+		kFieldModeMax		= 0xffff,
 	};
 
 	enum FilterMode {
@@ -73,6 +77,7 @@ public:
 	virtual void SetSourceSubrect(const vdrect32 *r) = 0;
 	virtual void SetSourceSolidColor(uint32 color) = 0;
 
+	virtual void SetReturnFocus(bool enable) = 0;
 	virtual void SetFullScreen(bool fs) = 0;
 
 	virtual void PostBuffer(VDVideoDisplayFrame *) = 0;
@@ -96,9 +101,10 @@ public:
 	virtual float GetSyncDelta() const = 0;
 };
 
-void VDVideoDisplaySetFeatures(bool enableDirectX, bool enableOverlays, bool enableTermServ, bool enableOpenGL, bool enableDirect3D, bool enableD3DFX);
+void VDVideoDisplaySetFeatures(bool enableDirectX, bool enableOverlays, bool enableTermServ, bool enableOpenGL, bool enableDirect3D, bool enableD3DFX, bool enableHighPrecision);
 void VDVideoDisplaySetD3DFXFileName(const wchar_t *path);
 void VDVideoDisplaySetDebugInfoEnabled(bool enable);
+void VDVideoDisplaySetBackgroundFallbackEnabled(bool enable);
 
 IVDVideoDisplay *VDGetIVideoDisplay(VDGUIHandle hwnd);
 bool VDRegisterVideoDisplayControl();

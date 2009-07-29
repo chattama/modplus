@@ -11,6 +11,7 @@
 			<tocnode target="p-filtercurves.html" name="Filter curves"/>
 			<tocnode target="video-filters.html" name="Video filter reference"/>
 		</tocnode>
+		<tocnode target="p-compression.html" name="Compression"/>
 		<tocnode target="p-render.html" name="Rendering/saving"/>
 		<tocnode target="p-artifacts.html" name="Artifacts"/>
 		<tocnode target="p-pipeline.html" name="The pipeline"/>
@@ -41,6 +42,9 @@
 				<lina:attrib name="name"><lina:arg name="name"/></lina:attrib>
 			</lina:tag>
 		</lina:for-each>
+	</tocnode>
+	<tocnode name="Batch operation">
+		<tocnode target="b-distributed.html" name="Distributed mode"/>
 	</tocnode>
 	<tocnode name="Advanced operation">
 		<tocnode target="amd64.html" name="AMD64 version"/>

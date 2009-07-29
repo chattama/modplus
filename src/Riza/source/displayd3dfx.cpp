@@ -30,7 +30,7 @@
 #include <vd2/Riza/direct3d.h>
 #include "d3dxfx.h"
 #include "displaydrv.h"
-#include "displaydrvdx9.h"
+#include <vd2/Riza/displaydrvdx9.h>
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -58,6 +58,38 @@ public:
 
 bool VDCreateD3D9TextureGeneratorFullSizeRTT(IVDD3D9TextureGenerator **ppGenerator) {
 	*ppGenerator = new VDD3D9TextureGeneratorFullSizeRTT;
+	if (!*ppGenerator)
+		return false;
+	(*ppGenerator)->AddRef();
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////
+
+class VDD3D9TextureGeneratorFullSizeRTT16F : public vdrefcounted<IVDD3D9TextureGenerator> {
+public:
+	bool GenerateTexture(VDD3D9Manager *pManager, IVDD3D9Texture *pTexture) {
+		const D3DPRESENT_PARAMETERS& parms = pManager->GetPresentParms();
+
+		int w = parms.BackBufferWidth;
+		int h = parms.BackBufferHeight;
+
+		pManager->AdjustTextureSize(w, h);
+
+		IDirect3DDevice9 *dev = pManager->GetDevice();
+		IDirect3DTexture9 *tex;
+		HRESULT hr = dev->CreateTexture(w, h, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A16B16G16R16F, D3DPOOL_DEFAULT, &tex, NULL);
+		if (FAILED(hr))
+			return false;
+
+		pTexture->SetD3DTexture(tex);
+		tex->Release();
+		return true;
+	}
+};
+
+bool VDCreateD3D9TextureGeneratorFullSizeRTT16F(IVDD3D9TextureGenerator **ppGenerator) {
+	*ppGenerator = new VDD3D9TextureGeneratorFullSizeRTT16F;
 	if (!*ppGenerator)
 		return false;
 	(*ppGenerator)->AddRef();
@@ -709,7 +741,7 @@ bool VDVideoDisplayMinidriverD3DFX::Init(HWND hwnd, const VDVideoDisplaySourceIn
 		return false;
 	}
 
-	if (!mpUploadContext->Init(info.pixmap, info.bAllowConversion, mhPrevSrc2Texture ? 3 : mhPrevSrcTexture ? 2 : 1)) {
+	if (!mpUploadContext->Init(info.pixmap, info.bAllowConversion, false, mhPrevSrc2Texture ? 3 : mhPrevSrcTexture ? 2 : 1)) {
 		Shutdown();
 		return false;
 	}
@@ -1197,7 +1229,7 @@ bool VDVideoDisplayMinidriverD3DFX::UpdateScreen(const RECT& rClient, UpdateMode
 		return true;
 	else if (hr == S_OK) {
 		uint64 curTime = VDGetPreciseTick();
-		float ft = (curTime - mLastFrameTime) * VDGetPreciseSecondsPerTick();
+		float ft = (float)((curTime - mLastFrameTime) * VDGetPreciseSecondsPerTick());
 		if (mLastLongestFrameTime < ft)
 			mLastLongestFrameTime = ft;
 		mLastFrameTime = curTime;

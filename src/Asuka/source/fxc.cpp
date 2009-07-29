@@ -38,12 +38,14 @@ namespace
 		"vd_srctexture",
 		"vd_src2atexture",
 		"vd_src2btexture",
+		"vd_srcpaltexture",
 		"vd_temptexture",
 		"vd_temp2texture",
 		"vd_cubictexture",
 		"vd_hevenoddtexture",
+		"vd_dithertexture",
 		"vd_interphtexture",
-		"vd_interpvtexture"
+		"vd_interpvtexture",
 	};
 
 	static const char *const kParameterNames[]={
@@ -63,6 +65,7 @@ namespace
 		"vd_time",
 		"vd_interphtexsize",
 		"vd_interpvtexsize",
+		"vd_fieldinfo",
 	};
 }
 
@@ -688,15 +691,6 @@ void tool_fxc(const vdfastvector<const char *>& args, const vdfastvector<const c
 	printf("Asuka: Compiling effect file (Direct3D): %s -> %s.\n", filename, args[1]);
 
 	vdrefptr<DummyD3DDevice> pDevice(new DummyD3DDevice);
-	vdrefptr<DummyD3DBaseTexture> pSrcTexture(new DummyD3DBaseTexture(pDevice, 1));
-	vdrefptr<DummyD3DBaseTexture> pSrc2aTexture(new DummyD3DBaseTexture(pDevice, 2));
-	vdrefptr<DummyD3DBaseTexture> pSrc2bTexture(new DummyD3DBaseTexture(pDevice, 3));
-	vdrefptr<DummyD3DBaseTexture> pTempTexture(new DummyD3DBaseTexture(pDevice, 4));
-	vdrefptr<DummyD3DBaseTexture> pTemp2Texture(new DummyD3DBaseTexture(pDevice, 5));
-	vdrefptr<DummyD3DBaseTexture> pCubicTexture(new DummyD3DBaseTexture(pDevice, 6));
-	vdrefptr<DummyD3DBaseTexture> pHEvenOddTexture(new DummyD3DBaseTexture(pDevice, 7));
-	vdrefptr<DummyD3DBaseTexture> pInterpHTexture(new DummyD3DBaseTexture(pDevice, 8));
-	vdrefptr<DummyD3DBaseTexture> pInterpVTexture(new DummyD3DBaseTexture(pDevice, 9));
 
 	vdrefptr<ID3DXEffect> pEffect;
 	vdrefptr<ID3DXBuffer> pErrors;
@@ -736,15 +730,13 @@ void tool_fxc(const vdfastvector<const char *>& args, const vdfastvector<const c
 	D3DXEFFECT_DESC desc;
 	pEffect->GetDesc(&desc);
 
-	pEffect->SetTexture("vd_srctexture", pSrcTexture);
-	pEffect->SetTexture("vd_src2atexture", pSrc2aTexture);
-	pEffect->SetTexture("vd_src2btexture", pSrc2bTexture);
-	pEffect->SetTexture("vd_temptexture", pTempTexture);
-	pEffect->SetTexture("vd_temp2texture", pTemp2Texture);
-	pEffect->SetTexture("vd_cubictexture", pCubicTexture);
-	pEffect->SetTexture("vd_hevenoddtexture", pHEvenOddTexture);
-	pEffect->SetTexture("vd_interphtexture", pInterpHTexture);
-	pEffect->SetTexture("vd_interpvtexture", pInterpVTexture);
+	vdrefptr<DummyD3DBaseTexture> pDummyTextures[sizeof(kTextureNames) / sizeof(kTextureNames[0])];
+
+	for(int i=0; i<sizeof(kTextureNames) / sizeof(kTextureNames[0]); ++i) {
+		pDummyTextures[i] = new DummyD3DBaseTexture(pDevice, i+1);
+
+		pEffect->SetTexture(kTextureNames[i], pDummyTextures[i]);
+	}
 
 	FILE *f = fopen(args[1], "w");
 	if (!f) {
@@ -955,7 +947,11 @@ void tool_fxc(const vdfastvector<const char *>& args, const vdfastvector<const c
 							pi.mViewportW = 1;
 						else if (hvp == "out")
 							pi.mViewportW = 2;
-						else if (hvp != "full")
+						else if (hvp == "unclipped")
+							pi.mViewportW = 3;
+						else if (hvp == "full")
+							pi.mViewportW = 0;
+						else
 							valid = false;
 					}
 
@@ -968,7 +964,11 @@ void tool_fxc(const vdfastvector<const char *>& args, const vdfastvector<const c
 							pi.mViewportH = 1;
 						else if (!strcmp(brk, "out"))
 							pi.mViewportH = 2;
-						else if (strcmp(brk, "full"))
+						else if (!strcmp(brk, "unclipped"))
+							pi.mViewportH = 3;
+						else if (!strcmp(brk, "full"))
+							pi.mViewportH = 0;
+						else
 							valid = false;
 					}
 

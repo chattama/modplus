@@ -18,6 +18,9 @@
 		/>
 	</Platforms>
 	<ToolFiles>
+		<ToolFile
+			RelativePath="..\YASM.rules"
+		/>
 	</ToolFiles>
 	<Configurations>
 		<Configuration
@@ -34,6 +37,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -104,6 +110,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="YASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -177,6 +186,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="YASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -247,6 +259,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="YASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -310,6 +325,18 @@
 			Name="Source Files"
 			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 			>
+			<File
+				RelativePath=".\source\ac_mpeg.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\ac_xlaw.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\source\audiocodec.cpp"
+				>
+			</File>
 			<File
 				RelativePath=".\source\audioformat.cpp"
 				>
@@ -827,6 +854,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\source\vc_huffyuv.cpp"
+				>
+			</File>
+			<File
 				RelativePath="source\w32audiocodec.cpp"
 				>
 				<FileConfiguration
@@ -924,10 +955,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\h\displaydrvdx9.h"
-				>
-			</File>
-			<File
 				RelativePath=".\h\displaymgr.h"
 				>
 			</File>
@@ -940,31 +967,11 @@
 				RelativePath="source\a_resync.asm"
 				>
 				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /coff /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
 					Name="Release|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /coff /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /coff /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -972,9 +979,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml /c /coff /nologo /Zi /Fo&quot;$(IntDir)\$(InputName).obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\$(InputName).obj"
+						Name="YASM"
 					/>
 				</FileConfiguration>
 			</File>
@@ -1041,7 +1046,7 @@
 						Name="VCCustomBuildTool"
 						Description=""
 						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fxc &quot;$(InputPath)&quot; &quot;$(InputDir)\..\h\$(InputName)_shader.inl&quot;&#x0D;&#x0A;"
-						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
+						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;;&quot;$(ProjectDir)source\displaydx9_ff.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps1.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps14.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps2.fxh&quot;;&quot;$(ProjectDir)source\stddefs.fxh&quot;;&quot;$(ProjectDir)source\utils.fxh&quot;"
 						Outputs="&quot;$(InputDir)\..\h\$(InputName)_shader.inl&quot;"
 					/>
 				</FileConfiguration>
@@ -1063,7 +1068,7 @@
 						Name="VCCustomBuildTool"
 						Description=""
 						CommandLine="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka&quot; fxc &quot;$(InputPath)&quot; &quot;$(InputDir)\..\h\$(InputName)_shader.inl&quot;&#x0D;&#x0A;"
-						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;"
+						AdditionalDependencies="&quot;$(VDBaseDir)\out\$(VDConfigDirTag)\asuka.exe&quot;;&quot;$(ProjectDir)source\displaydx9_ff.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps1.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps14.fxh&quot;;&quot;$(ProjectDir)source\displaydx9_ps2.fxh&quot;;&quot;$(ProjectDir)source\stddefs.fxh&quot;;&quot;$(ProjectDir)source\utils.fxh&quot;"
 						Outputs="&quot;$(InputDir)\..\h\$(InputName)_shader.inl&quot;"
 					/>
 				</FileConfiguration>
@@ -1078,6 +1083,30 @@
 						Outputs="&quot;$(InputDir)\..\h\$(InputName)_shader.inl&quot;"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\source\displaydx9_ff.fxh"
+				>
+			</File>
+			<File
+				RelativePath=".\source\displaydx9_ps1.fxh"
+				>
+			</File>
+			<File
+				RelativePath=".\source\displaydx9_ps14.fxh"
+				>
+			</File>
+			<File
+				RelativePath=".\source\displaydx9_ps2.fxh"
+				>
+			</File>
+			<File
+				RelativePath=".\source\stddefs.fxh"
+				>
+			</File>
+			<File
+				RelativePath=".\source\utils.fxh"
+				>
 			</File>
 		</Filter>
 		<Filter
@@ -1140,11 +1169,19 @@
 			Name="Interface Files"
 			>
 			<File
+				RelativePath="..\h\vd2\Riza\audiocodec.h"
+				>
+			</File>
+			<File
 				RelativePath="..\h\vd2\Riza\audioformat.h"
 				>
 			</File>
 			<File
 				RelativePath="..\h\vd2\Riza\audioout.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\Riza\avi.h"
 				>
 			</File>
 			<File
@@ -1185,6 +1222,10 @@
 			</File>
 			<File
 				RelativePath="..\h\vd2\Riza\display.h"
+				>
+			</File>
+			<File
+				RelativePath="..\h\vd2\Riza\displaydrvdx9.h"
 				>
 			</File>
 			<File

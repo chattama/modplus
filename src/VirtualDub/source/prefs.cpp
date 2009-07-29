@@ -21,6 +21,7 @@
 
 #include <windows.h>
 #include <commctrl.h>
+#include <mmsystem.h>
 
 #include <vd2/Dita/interface.h>
 #include <vd2/system/registry.h>
@@ -45,19 +46,36 @@ namespace {
 		bool			mbAllowDirectYCbCrDecoding;
 		bool			mbDisplayEnableDebugInfo;
 		bool			mbConfirmRenderAbort;
+		bool			mbRenderWarnNoAudio;
 		bool			mbEnableAVIAlignmentThreshold;
-		bool			mbPreferInternalDecoders;
+		bool			mbEnableAVIVBRWarning;
+		bool			mbPreferInternalVideoDecoders;
+		bool			mbPreferInternalAudioDecoders;
 		uint32			mAVIAlignmentThreshold;
 		uint32			mRenderOutputBufferSize;
 		uint32			mRenderWaveBufferSize;
 		uint32			mRenderVideoBufferCount;
+		uint32			mRenderAudioBufferSeconds;
 		uint32			mRenderThrottlePercent;
 		VDStringW		mD3DFXFile;
 		uint32			mFileAsyncDefaultMode;
 		uint32			mAVISuperindexLimit;
 		uint32			mAVISubindexLimit;
 
+		VDFraction		mImageSequenceFrameRate;
+
 		bool			mbDisplayAllowDirectXOverlays;
+		bool			mbDisplayEnableHighPrecision;
+		bool			mbDisplayEnableBackgroundFallback;
+
+		int				mVideoCompressionThreads;
+
+		VDStringW		mAudioPlaybackDeviceKey;
+
+		uint32			mEnabledCPUFeatures;
+
+		bool			mbFilterAccelEnabled;
+		bool			mbFilterAccelDebugEnabled;		// NOT saved
 	} g_prefs2;
 }
 
@@ -130,6 +148,8 @@ public:
 			SetValue(106, 0 != (mPrefs.mOldPrefs.fDisplay & Preferences::kDisplayEnableVSync));
 			SetValue(107, mPrefs.mbDisplayAllowDirectXOverlays);
 			SetValue(108, mPrefs.mbDisplayEnableDebugInfo);
+			SetValue(109, mPrefs.mbDisplayEnableHighPrecision);
+			SetValue(110, mPrefs.mbDisplayEnableBackgroundFallback);
 			SetCaption(300, mPrefs.mD3DFXFile.c_str());
 			pBase->ExecuteAllLinks();
 			return true;
@@ -145,6 +165,8 @@ public:
 			if ( GetValue(106)) mPrefs.mOldPrefs.fDisplay |= Preferences::kDisplayEnableVSync;
 			mPrefs.mbDisplayAllowDirectXOverlays = GetValue(107) != 0;
 			mPrefs.mbDisplayEnableDebugInfo = GetValue(108) != 0;
+			mPrefs.mbDisplayEnableHighPrecision = GetValue(109) != 0;
+			mPrefs.mbDisplayEnableBackgroundFallback = GetValue(110) != 0;
 			mPrefs.mD3DFXFile = GetCaption(300);
 			return true;
 		}
@@ -161,27 +183,35 @@ public:
 		switch(type) {
 		case kEventAttach:
 			mpBase = pBase;
-			SetValue(100, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_FORCE));
-			SetValue(200, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_FPU));
-			SetValue(201, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_MMX));
-			SetValue(202, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_INTEGER_SSE));
-			SetValue(203, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_SSE));
-			SetValue(204, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_SSE2));
-			SetValue(205, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_3DNOW));
-			SetValue(206, 0 != (mPrefs.mOldPrefs.main.fOptimizations & PreferencesMain::OPTF_3DNOW_EXT));
+			SetValue(100, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_FORCE));
+			SetValue(200, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_FPU));
+			SetValue(201, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_MMX));
+			SetValue(202, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_INTEGER_SSE));
+			SetValue(203, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_SSE));
+			SetValue(204, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_SSE2));
+			SetValue(205, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_3DNOW));
+			SetValue(206, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_3DNOW_EXT));
+			SetValue(207, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_SSE3));
+			SetValue(208, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_SSSE3));
+			SetValue(209, 0 != (mPrefs.mEnabledCPUFeatures & PreferencesMain::OPTF_SSE4_1));
 			pBase->ExecuteAllLinks();
 			return true;
 		case kEventSync:
 		case kEventDetach:
-			mPrefs.mOldPrefs.main.fOptimizations = 0;
-			if (GetValue(100)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_FORCE;
-			if (GetValue(200)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_FPU;
-			if (GetValue(201)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_MMX;
-			if (GetValue(202)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_INTEGER_SSE;
-			if (GetValue(203)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_SSE;
-			if (GetValue(204)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_SSE2;
-			if (GetValue(205)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_3DNOW;
-			if (GetValue(206)) mPrefs.mOldPrefs.main.fOptimizations |= PreferencesMain::OPTF_3DNOW_EXT;
+			mPrefs.mEnabledCPUFeatures = 0;
+			if (GetValue(100)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_FORCE;
+			if (GetValue(200)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_FPU;
+			if (GetValue(201)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_MMX;
+			if (GetValue(202)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_INTEGER_SSE;
+			if (GetValue(203)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_SSE;
+			if (GetValue(204)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_SSE2;
+			if (GetValue(205)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_3DNOW;
+			if (GetValue(206)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_3DNOW_EXT;
+			if (GetValue(207)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_SSE3;
+			if (GetValue(208)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_SSSE3;
+			if (GetValue(209)) mPrefs.mEnabledCPUFeatures |= PreferencesMain::OPTF_SSE4_1;
+
+			mPrefs.mOldPrefs.main.fOptimizations = (char)mPrefs.mEnabledCPUFeatures;
 			return true;
 		}
 		return false;
@@ -272,7 +302,9 @@ public:
 				v = mPrefs.mAVISubindexLimit;
 				SetCaption(202, VDswprintf(L"%u", 1, &v).c_str());
 			}
-			SetValue(104, mPrefs.mbPreferInternalDecoders);
+			SetValue(104, mPrefs.mbPreferInternalVideoDecoders);
+			SetValue(105, mPrefs.mbPreferInternalAudioDecoders);
+			SetValue(106, mPrefs.mbEnableAVIVBRWarning);
 			pBase->ExecuteAllLinks();
 			return true;
 		case kEventDetach:
@@ -282,9 +314,15 @@ public:
 			mPrefs.mbAllowDirectYCbCrDecoding = 0!=GetValue(102);
 			if (mPrefs.mbEnableAVIAlignmentThreshold = (0 != GetValue(103)))
 				mPrefs.mAVIAlignmentThreshold = (uint32)wcstoul(GetCaption(200).c_str(), 0, 10);
-			mPrefs.mbPreferInternalDecoders = 0!=GetValue(104);
-			mPrefs.mAVISubindexLimit = (uint32)wcstoul(GetCaption(201).c_str(), 0, 10);
-			mPrefs.mAVISuperindexLimit = (uint32)wcstoul(GetCaption(202).c_str(), 0, 10);
+			mPrefs.mbPreferInternalVideoDecoders = 0!=GetValue(104);
+			mPrefs.mbPreferInternalAudioDecoders = 0!=GetValue(105);
+			mPrefs.mAVISuperindexLimit = (uint32)wcstoul(GetCaption(201).c_str(), 0, 10);
+			if (mPrefs.mAVISuperindexLimit < 1)
+				mPrefs.mAVISuperindexLimit = 1;
+			mPrefs.mAVISubindexLimit = (uint32)wcstoul(GetCaption(202).c_str(), 0, 10);
+			if (mPrefs.mAVISubindexLimit < 1)
+				mPrefs.mAVISubindexLimit = 1;
+			mPrefs.mbEnableAVIVBRWarning = 0!=GetValue(106);
 			return true;
 		}
 		return false;
@@ -323,10 +361,12 @@ public:
 			mpBase = pBase;
 			pBase->ExecuteAllLinks();
 			SetValue(100, mPrefs.mbConfirmRenderAbort);
+			SetValue(101, mPrefs.mbRenderWarnNoAudio);
 			return true;
 		case kEventDetach:
 		case kEventSync:
 			mPrefs.mbConfirmRenderAbort = 0 != GetValue(100);
+			mPrefs.mbRenderWarnNoAudio = 0 != GetValue(101);
 			return true;
 		}
 		return false;
@@ -354,6 +394,183 @@ public:
 	}
 };
 
+class VDDialogPreferencesImages : public VDDialogBase {
+public:
+	VDPreferences2& mPrefs;
+	VDDialogPreferencesImages(VDPreferences2& p) : mPrefs(p) {}
+
+	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
+		switch(type) {
+		case kEventAttach:
+			mpBase = pBase;
+			pBase->ExecuteAllLinks();
+			{
+				char buf[128];
+				sprintf(buf, "%.4f", mPrefs.mImageSequenceFrameRate.asDouble());
+
+				VDFraction fr2(mPrefs.mImageSequenceFrameRate);
+				VDVERIFY(fr2.Parse(buf));
+
+				if (fr2 != mPrefs.mImageSequenceFrameRate)
+					sprintf(buf, "%u/%u (~%.7f)", mPrefs.mImageSequenceFrameRate.getHi(), mPrefs.mImageSequenceFrameRate.getLo(), mPrefs.mImageSequenceFrameRate.asDouble());
+
+				SetCaption(100, VDTextAToW(buf).c_str());
+			}
+			return true;
+		case kEventDetach:
+		case kEventSync:
+			{
+				const VDStringA s(VDTextWToA(GetCaption(100)));
+				VDFraction fr;
+				unsigned hi, lo;
+				bool failed = false;
+				if (2==sscanf(s.c_str(), " %u / %u", &hi, &lo)) {
+					if (!lo)
+						failed = true;
+					else
+						fr = VDFraction(hi, lo);
+				} else if (!fr.Parse(s.c_str()) || fr.asDouble() >= 1000000.0) {
+					failed = true;
+				}
+
+				if (fr.getHi() == 0)
+					failed = true;
+
+				if (!failed) {
+					mPrefs.mImageSequenceFrameRate = fr;
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+};
+
+class VDDialogPreferencesThreading : public VDDialogBase {
+public:
+	VDPreferences2& mPrefs;
+	VDDialogPreferencesThreading(VDPreferences2& p) : mPrefs(p) {}
+
+	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
+		switch(type) {
+		case kEventAttach:
+			mpBase = pBase;
+			pBase->ExecuteAllLinks();
+
+			{
+				unsigned i = mPrefs.mVideoCompressionThreads;
+				SetCaption(100, VDswprintf(L"%u", 1, &i).c_str());
+			}
+
+			return true;
+		case kEventDetach:
+		case kEventSync:
+			mPrefs.mVideoCompressionThreads = std::min<uint32>(wcstoul(GetCaption(100).c_str(), 0, 10), 32);
+			return true;
+		}
+		return false;
+	}
+};
+
+class VDDialogPreferencesPlayback : public VDDialogBase {
+public:
+	VDPreferences2& mPrefs;
+	VDDialogPreferencesPlayback(VDPreferences2& p) : mPrefs(p) {}
+
+	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
+		switch(type) {
+		case kEventAttach:
+			mpBase = pBase;
+			pBase->ExecuteAllLinks();
+
+			{
+				UINT numDevices = waveOutGetNumDevs();
+				IVDUIWindow *win = pBase->GetControl(100);
+				IVDUIList *list = vdpoly_cast<IVDUIList *>(win);
+
+				mPlaybackDeviceKeys.clear();
+				mPlaybackDeviceKeys.resize(numDevices + 1);
+
+				if (list) {
+					list->AddItem(L"Default system playback device");
+
+					for(UINT i=0; i<numDevices; ++i) {
+						WAVEOUTCAPSA caps = {0};
+
+						if (MMSYSERR_NOERROR == waveOutGetDevCapsA(i, &caps, sizeof(caps))) {
+							const VDStringW key(VDTextAToW(caps.szPname).c_str());
+
+							mPlaybackDeviceKeys[i + 1] = key;
+
+							list->AddItem(key.c_str(), i + 1);
+						}
+					}
+
+					PlaybackDeviceKeys::const_iterator it(std::find(mPlaybackDeviceKeys.begin(), mPlaybackDeviceKeys.end(), mPrefs.mAudioPlaybackDeviceKey));
+					if (it != mPlaybackDeviceKeys.end())
+						win->SetValue(it - mPlaybackDeviceKeys.begin());
+					else
+						win->SetValue(0);
+				}
+			}
+
+			return true;
+		case kEventDetach:
+		case kEventSync:
+			{
+				IVDUIWindow *win = pBase->GetControl(100);
+				int index = 0;
+
+				if (win) {
+					IVDUIList *list = vdpoly_cast<IVDUIList *>(win);
+					if (list) {
+						int i = win->GetValue();
+
+						if (i >= 0)
+							index = list->GetItemData(i);
+					}
+				}
+
+				if ((uint32)index < mPlaybackDeviceKeys.size())
+					mPrefs.mAudioPlaybackDeviceKey = mPlaybackDeviceKeys[index];
+				else
+					mPrefs.mAudioPlaybackDeviceKey.clear();
+			}
+			return true;
+		}
+		return false;
+	}
+
+protected:
+	typedef std::vector<VDStringW> PlaybackDeviceKeys;
+	PlaybackDeviceKeys mPlaybackDeviceKeys;
+};
+
+class VDDialogPreferencesAccel : public VDDialogBase {
+public:
+	VDPreferences2& mPrefs;
+	VDDialogPreferencesAccel(VDPreferences2& p) : mPrefs(p) {}
+
+	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
+		switch(type) {
+		case kEventAttach:
+			mpBase = pBase;
+			pBase->ExecuteAllLinks();
+			SetValue(100, mPrefs.mbFilterAccelEnabled);
+			return true;
+		case kEventDetach:
+		case kEventSync:
+			mPrefs.mbFilterAccelEnabled = GetValue(100) != 0;
+			return true;
+		}
+		return false;
+	}
+
+protected:
+	typedef std::vector<VDStringW> PlaybackDeviceKeys;
+	PlaybackDeviceKeys mPlaybackDeviceKeys;
+};
+
 class VDDialogPreferences : public VDDialogBase {
 public:
 	VDPreferences2& mPrefs;
@@ -377,6 +594,10 @@ public:
 				case 5:	pSubDialog->SetCallback(new VDDialogPreferencesTimeline(mPrefs), true); break;
 				case 6:	pSubDialog->SetCallback(new VDDialogPreferencesDub(mPrefs), true); break;
 				case 7:	pSubDialog->SetCallback(new VDDialogPreferencesDiskIO(mPrefs), true); break;
+				case 8:	pSubDialog->SetCallback(new VDDialogPreferencesImages(mPrefs), true); break;
+				case 9:	pSubDialog->SetCallback(new VDDialogPreferencesThreading(mPrefs), true); break;
+				case 10:	pSubDialog->SetCallback(new VDDialogPreferencesPlayback(mPrefs), true); break;
+				case 11:	pSubDialog->SetCallback(new VDDialogPreferencesAccel(mPrefs), true); break;
 				}
 			}
 		} else if (type == kEventSelect) {
@@ -443,12 +664,16 @@ void LoadPreferences() {
 
 	g_prefs2.mbAllowDirectYCbCrDecoding = key.getBool("Allow direct YCbCr decoding", true);
 	g_prefs2.mbConfirmRenderAbort = key.getBool("Confirm render abort", true);
+	g_prefs2.mbRenderWarnNoAudio = key.getBool("Render: Warn if no audio", false);
 	g_prefs2.mbEnableAVIAlignmentThreshold = key.getBool("AVI: Alignment threshold enable", false);
+	g_prefs2.mbEnableAVIVBRWarning = key.getBool("AVI: VBR warning enabled", true);
 	g_prefs2.mAVIAlignmentThreshold = key.getInt("AVI: Alignment threshold", 524288);
-	g_prefs2.mbPreferInternalDecoders = key.getBool("AVI: Prefer internal decoders", false);
+	g_prefs2.mbPreferInternalVideoDecoders = key.getBool("AVI: Prefer internal decoders", false);
+	g_prefs2.mbPreferInternalAudioDecoders = key.getBool("AVI: Prefer internal audio decoders", false);
 	g_prefs2.mRenderOutputBufferSize = std::max<uint32>(65536, std::min<uint32>(0x10000000, key.getInt("Render: Output buffer size", 2097152)));
 	g_prefs2.mRenderWaveBufferSize = std::max<uint32>(65536, std::min<uint32>(0x10000000, key.getInt("Render: Wave buffer size", 65536)));
 	g_prefs2.mRenderVideoBufferCount = std::max<uint32>(1, std::min<uint32>(65536, key.getInt("Render: Video buffer count", 32)));
+	g_prefs2.mRenderAudioBufferSeconds = std::max<uint32>(1, std::min<uint32>(32, key.getInt("Render: Audio buffer seconds", 2)));
 	g_prefs2.mRenderThrottlePercent = std::max<uint32>(10, std::min<uint32>(100, key.getInt("Render: Default throttle percent", 100)));
 	g_prefs2.mFileAsyncDefaultMode = std::min<uint32>(IVDFileAsync::kModeCount-1, key.getInt("File: Async mode", IVDFileAsync::kModeAsynchronous));
 	g_prefs2.mAVISuperindexLimit = key.getInt("AVI: Superindex entry limit", 256);
@@ -456,6 +681,21 @@ void LoadPreferences() {
 
 	g_prefs2.mbDisplayAllowDirectXOverlays = key.getBool("Display: Allow DirectX overlays", true);
 	g_prefs2.mbDisplayEnableDebugInfo = key.getBool("Display: Enable debug info", false);
+	g_prefs2.mbDisplayEnableHighPrecision = key.getBool("Display: Enable high precision", false);
+	g_prefs2.mbDisplayEnableBackgroundFallback = key.getBool("Display: Enable background fallback", true);
+
+	uint32 imageSeqHi = key.getInt("Images: Frame rate numerator", 10);
+	uint32 imageSeqLo = key.getInt("Images: Frame rate denominator", 1);
+
+	g_prefs2.mImageSequenceFrameRate.Assign(imageSeqHi, imageSeqLo);
+
+	g_prefs2.mVideoCompressionThreads = key.getInt("Threading: Video compression threads", 0);
+
+	key.getString("Playback: Default audio device", g_prefs2.mAudioPlaybackDeviceKey);
+
+	g_prefs2.mbFilterAccelEnabled = key.getBool("Filters: Enable 3D hardware acceleration", false);
+
+	g_prefs2.mEnabledCPUFeatures = key.getInt("CPU: Enabled extensions", 0);
 
 	g_prefs2.mOldPrefs = g_prefs;
 
@@ -469,20 +709,37 @@ void VDSavePreferences(VDPreferences2& prefs) {
 	key.setString("Timeline format", prefs.mTimelineFormat.c_str());
 	key.setBool("Allow direct YCbCr decoding", prefs.mbAllowDirectYCbCrDecoding);
 	key.setBool("Confirm render abort", prefs.mbConfirmRenderAbort);
+	key.setBool("Render: Warn if no audio", prefs.mbRenderWarnNoAudio);
 	key.setBool("AVI: Alignment threshold enable", prefs.mbEnableAVIAlignmentThreshold);
 	key.setInt("AVI: Alignment threshold", prefs.mAVIAlignmentThreshold);
-	key.setBool("AVI: Prefer internal decoders", prefs.mbPreferInternalDecoders);
+	key.setBool("AVI: VBR warning enabled", prefs.mbEnableAVIVBRWarning);
+	key.setBool("AVI: Prefer internal decoders", prefs.mbPreferInternalVideoDecoders);
+	key.setBool("AVI: Prefer internal audio decoders", prefs.mbPreferInternalAudioDecoders);
 	key.setString("Direct3D FX file", prefs.mD3DFXFile.c_str());
 	key.setInt("Render: Output buffer size", prefs.mRenderOutputBufferSize);
 	key.setInt("Render: Wave buffer size", prefs.mRenderWaveBufferSize);
 	key.setInt("Render: Video buffer count", prefs.mRenderVideoBufferCount);
+	key.setInt("Render: Audio buffer seconds", prefs.mRenderAudioBufferSeconds);
 	key.setInt("Render: Default throttle percent", prefs.mRenderThrottlePercent);
 	key.setInt("File: Async mode", prefs.mFileAsyncDefaultMode);
 	key.setInt("AVI: Superindex entry limit", prefs.mAVISuperindexLimit);
 	key.setInt("AVI: Subindex entry limit", prefs.mAVISubindexLimit);
 
 	key.setBool("Display: Allow DirectX overlays", prefs.mbDisplayAllowDirectXOverlays);
-	key.setBool("Display: Enable debug info", g_prefs2.mbDisplayEnableDebugInfo);
+	key.setBool("Display: Enable debug info", prefs.mbDisplayEnableDebugInfo);
+	key.setBool("Display: Enable high precision", prefs.mbDisplayEnableHighPrecision);
+	key.setBool("Display: Enable background fallback", prefs.mbDisplayEnableBackgroundFallback);
+
+	key.setInt("Images: Frame rate numerator", prefs.mImageSequenceFrameRate.getHi());
+	key.setInt("Images: Frame rate denominator", prefs.mImageSequenceFrameRate.getLo());
+
+	key.setInt("Threading: Video compression threads", prefs.mVideoCompressionThreads);
+
+	key.setString("Playback: Default audio device", prefs.mAudioPlaybackDeviceKey.c_str());
+
+	key.setBool("Filters: Enable 3D hardware acceleration", prefs.mbFilterAccelEnabled);
+
+	key.setInt("CPU: Enabled extensions", prefs.mEnabledCPUFeatures);
 }
 
 void VDSavePreferences() {
@@ -501,6 +758,10 @@ bool VDPreferencesIsRenderAbortConfirmEnabled() {
 	return g_prefs2.mbConfirmRenderAbort;
 }
 
+bool VDPreferencesIsRenderNoAudioWarningEnabled() {
+	return g_prefs2.mbRenderWarnNoAudio;
+}
+
 uint32 VDPreferencesGetAVIAlignmentThreshold() {
 	return g_prefs2.mbEnableAVIAlignmentThreshold ? g_prefs2.mAVIAlignmentThreshold : 0;
 }
@@ -510,8 +771,16 @@ void VDPreferencesGetAVIIndexingLimits(uint32& superindex, uint32& subindex) {
 	subindex = g_prefs2.mAVISubindexLimit;
 }
 
-bool VDPreferencesIsPreferInternalDecodersEnabled() {
-	return g_prefs2.mbPreferInternalDecoders;
+bool VDPreferencesIsAVIVBRWarningEnabled() {
+	return g_prefs2.mbEnableAVIVBRWarning;
+}
+
+bool VDPreferencesIsPreferInternalVideoDecodersEnabled() {
+	return g_prefs2.mbPreferInternalVideoDecoders;
+}
+
+bool VDPreferencesIsPreferInternalAudioDecodersEnabled() {
+	return g_prefs2.mbPreferInternalAudioDecoders;
 }
 
 const VDStringW& VDPreferencesGetD3DFXFile() {
@@ -530,12 +799,44 @@ uint32& VDPreferencesGetRenderVideoBufferCount() {
 	return g_prefs2.mRenderVideoBufferCount;
 }
 
+uint32& VDPreferencesGetRenderAudioBufferSeconds() {
+	return g_prefs2.mRenderAudioBufferSeconds;
+}
+
 uint32 VDPreferencesGetRenderThrottlePercent() {
 	return g_prefs2.mRenderThrottlePercent;
 }
 
 uint32 VDPreferencesGetFileAsyncDefaultMode() {
 	return g_prefs2.mFileAsyncDefaultMode;
+}
+
+const VDFraction& VDPreferencesGetImageSequenceFrameRate() {
+	return g_prefs2.mImageSequenceFrameRate;
+}
+
+int VDPreferencesGetVideoCompressionThreadCount() {
+	return g_prefs2.mVideoCompressionThreads;
+}
+
+uint32 VDPreferencesGetEnabledCPUFeatures() {
+	return g_prefs2.mEnabledCPUFeatures;
+}
+
+const VDStringW& VDPreferencesGetAudioPlaybackDeviceKey() {
+	return g_prefs2.mAudioPlaybackDeviceKey;
+}
+
+bool VDPreferencesGetFilterAccelEnabled() {
+	return g_prefs2.mbFilterAccelEnabled;
+}
+
+void VDPreferencesSetFilterAccelVisualDebugEnabled(bool enabled) {
+	g_prefs2.mbFilterAccelDebugEnabled = enabled;
+}
+
+bool VDPreferencesGetFilterAccelVisualDebugEnabled() {
+	return g_prefs2.mbFilterAccelDebugEnabled;
 }
 
 void VDPreferencesUpdated() {
@@ -545,9 +846,11 @@ void VDPreferencesUpdated() {
 		!!(g_prefs2.mOldPrefs.fDisplay & Preferences::kDisplayUseDXWithTS),
 		!!(g_prefs2.mOldPrefs.fDisplay & Preferences::kDisplayEnableOpenGL),
 		!!(g_prefs2.mOldPrefs.fDisplay & Preferences::kDisplayEnableD3D),
-		!!(g_prefs2.mOldPrefs.fDisplay & Preferences::kDisplayEnableD3DFX)
+		!!(g_prefs2.mOldPrefs.fDisplay & Preferences::kDisplayEnableD3DFX),
+		g_prefs2.mbDisplayEnableHighPrecision
 		);
 
 	VDVideoDisplaySetD3DFXFileName(g_prefs2.mD3DFXFile.c_str());
 	VDVideoDisplaySetDebugInfoEnabled(g_prefs2.mbDisplayEnableDebugInfo);
+	VDVideoDisplaySetBackgroundFallbackEnabled(g_prefs2.mbDisplayEnableBackgroundFallback);
 }
