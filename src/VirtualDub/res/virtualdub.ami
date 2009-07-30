@@ -178,12 +178,20 @@ template kTemplateOKCancel {
 	}
 }
 
-dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
+// modplus
+// BEGIN **************************************************************
+//dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
+dialog 1000, "Preferences" : minw=370, maxw=370, aspect=140, valign=top+expand {
+// END ****************************************************************
 	set 0: vertical {
 		set 0 : spacing=5 {
 			now fill;
 
-			listbox 100 : minw=50, sunken, align=left {
+// modplus
+// BEGIN **************************************************************
+//			listbox 100 : minw=50, sunken, align=left {
+			listbox 100 : minw=70, sunken, align=left {
+// END ****************************************************************
 				listitem "Main";
 				listitem "Display";
 				listitem "Scene";
@@ -196,6 +204,11 @@ dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
 				listitem "Threading";
 				listitem "Playback";
 				listitem "3D accel";
+// modplus
+// BEGIN **************************************************************
+				listitem "Script Editor";
+				listitem "Script Editor keys";
+// END ****************************************************************
 			}
 
 			pageset 101 : value={@100} {
@@ -211,6 +224,11 @@ dialog 1000, "Preferences" : minw=350, maxw=350, aspect=140, valign=top+expand {
 				page 1019;
 				page 1020;
 				page 1021;
+// modplus
+// BEGIN **************************************************************
+				page 10001;
+				page 10002;
+// END ****************************************************************
 			}
 		}
 
@@ -683,3 +701,79 @@ dialog 3001, "Create animated GIF" : aspect=140, maxw=350, align=fill {
 dialog 9000, "Output window" : minw=350, aspect=140, valign=fill+expand {
 	textarea 100, "" : fill;
 }
+
+// modplus
+// BEGIN **************************************************************
+dialog 10001, "" : fill, child {
+	now align=fill;
+	set 0: vertical {
+		group 0, "Script Editor" {
+			set 0 : vertical {
+				checkbox 100, "Single Instance Mode";
+				textarea 200, "Allow only one open script editor window."
+					: margint=2, marginb=5, marginl=15, fill, readonly, minh=10;
+
+				checkbox 101, "Autopopup";
+				textarea 201, "Automatically popup script editor when an AviSynth script is loaded into the main window. In single instance mode if there is already an open script editor window, the newly opened script is loaded into that."
+					: margint=2, marginb=5, marginl=15, fill, readonly, minh=40;
+
+				set 0 : align=left, spacing=3 {
+					button 102, "Font" : minw=50, minh=14;
+					label 103, "Font" : valign=center, minw=200;
+				}
+			}
+		}
+	}
+}
+
+dialog 10002, "" : fill, child {
+	now fill;
+	set 0: vertical {
+		group 1, "Script Editor keys" : marginb=2 {
+			listview 100, "" : sunken;
+		}
+		set 0 : valign=bottom, align=right, spacing=3, marginb=5 {
+			now minw=50, minh=14;
+			button 200, "Default";
+		}
+	}
+}
+
+dialog 10003, "" {
+	set 0 : vertical {
+		group 1, "Primary Key" : marginb=5 {
+			set 0 {
+				now valign=center, marginl=5, marginr=5;
+				combobox 100 : minw=50 {
+					listitem "ASCII";
+					listitem "VIRTKEY";
+				}
+				checkbox 101, "&Alt";
+				checkbox 102, "&Control";
+				checkbox 103, "&Shift";
+
+				set 0 : minw=40, marginr=5;
+			}
+		}
+		group 2, "Secondary Key" : marginb=5 {
+			set 0 {
+				now valign=center, marginl=5, marginr=5;
+				combobox 200 : minw=50 {
+					listitem "ASCII";
+					listitem "VIRTKEY";
+				}
+				checkbox 201, "&Alt";
+				checkbox 202, "&Control";
+				checkbox 203, "&Shift";
+
+				set 0 : minw=40, marginr=5;
+			}
+		}
+		set 0 : valign=bottom, align=center, spacing=3 {
+			now minw=50, minh=14;
+			button kID_OK, [1000, 10];
+			button kID_Cancel, [1000, 11];
+		}
+	}
+}
+// END ****************************************************************

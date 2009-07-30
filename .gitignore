@@ -1,0 +1,6 @@
+lib
+obj
+out
+*.ncb
+*.suo
+*.user

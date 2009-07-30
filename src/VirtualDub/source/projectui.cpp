@@ -54,7 +54,11 @@
 #include "mrulist.h"
 #include "InputFile.h"
 #include "VideoWindow.h"
-#include "AccelEditDialog.h"
+
+// modplus
+// BEGIN **************************************************************
+#include "modplus.h"
+// END ****************************************************************
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -353,6 +357,10 @@ namespace {
 		{ ID_TOOLS_BENCHMARKRESAMPLER,	"Tools.BenchmarkResampler" },
 		{ ID_TOOLS_CREATEPALETTIZEDAVI,	"Tools.CreatePalettizedAVI" },
 		{ ID_TOOLS_CREATETESTVIDEO,		"Tools.CreateTestVideo" },
+// modplus
+// BEGIN **************************************************************
+		{ ID_TOOLS_AVS,					"Tools.AVSEditor" },
+// END ****************************************************************
 		{ ID_HELP_LICENSE,				"Help.ShowLicense" },
 		{ ID_HELP_CONTENTS,				"Help.ShowContents" },
 		{ ID_HELP_CHANGELOG,			"Help.ShowChangeLog" },
@@ -1667,6 +1675,10 @@ bool VDProjectUI::MenuHit(UINT id) {
 		case ID_DUBINPROGRESS_ABORT:			AbortOperation();			break;
 
 		default:
+// modplus
+// BEGIN **************************************************************
+			if (MenuHitMod((HWND)mhwnd, id)) break;
+// END ****************************************************************
 			if (id >= ID_AUDIO_SOURCE_AVI_0 && id <= ID_AUDIO_SOURCE_AVI_0+99) {
 				SetAudioSourceNormal(id - ID_AUDIO_SOURCE_AVI_0);
 			} else if (id >= ID_MRU_FILE0 && id <= ID_MRU_FILE3) {
@@ -1679,6 +1691,10 @@ bool VDProjectUI::MenuHit(UINT id) {
 					VDAutoLogDisplay logDisp;
 					g_project->Open(name.c_str(), NULL, bExtendedOpen, false, true);
 					logDisp.Post(mhwnd);
+// modplus
+// BEGIN **************************************************************
+					AVSViewerOpen((HWND)mhwnd);
+// END ****************************************************************
 				}
 				break;
 			}
@@ -2069,7 +2085,18 @@ LRESULT VDProjectUI::MainWndProc( UINT msg, WPARAM wParam, LPARAM lParam) {
 			e.post((HWND)mhwnd, g_szError);
 		}
 		return 0;
+// modplus
+// BEGIN **************************************************************
+	default:
+		{
+			bool b;
+			LRESULT r = MainWndProcMod(msg, wParam, lParam, b);
+			if (!b) return r;
+			break;
+		}
+		break;
 	}
+// END ****************************************************************
 
 	return VDUIFrame::GetFrame((HWND)mhwnd)->DefProc((HWND)mhwnd, msg, wParam, lParam);
 }
@@ -2218,6 +2245,10 @@ void VDProjectUI::HandleDragDrop(HDROP hdrop) {
 			Open(filename.c_str(), NULL, false);
 
 			logDisp.Post(mhwnd);
+// modplus
+// BEGIN **************************************************************
+			AVSViewerOpen((HWND)mhwnd);
+// END ****************************************************************
 		} catch(const MyError& e) {
 			e.post((HWND)mhwnd, g_szError);
 		}

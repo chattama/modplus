@@ -85,7 +85,11 @@ char g_serverName[256];
 extern const char g_szError[]="VirtualDub Error";
 extern const char g_szWarning[]="VirtualDub Warning";
 
-static const char g_szRegKeyPersistence[]="Persistence";
+// modplus
+// BEGIN **************************************************************
+//static const char g_szRegKeyPersistence[]="Persistence";
+extern const char g_szRegKeyPersistence[]="Persistence";
+// END ****************************************************************
 
 ///////////////////////////
 
@@ -246,6 +250,9 @@ static const wchar_t fileFiltersSaveConfig[]=
 
 
   
+// modplus
+// BEGIN **************************************************************
+#if 0
 void OpenAVI(bool ext_opt) {
 	bool fExtendedOpen = false;
 	bool fAutoscan = false;
@@ -297,6 +304,8 @@ void SaveAVI(HWND hWnd, bool fUseCompatibility, bool queueAsJob) {
 		g_project->SaveAVI(fname.c_str(), fUseCompatibility, queueAsJob);
 	}
 }
+#endif
+// END ****************************************************************
 
 ///////////////////////////////////////////////////////////////////////////
 

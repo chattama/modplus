@@ -32,6 +32,10 @@ struct VDFileDialogOption {
 		kBool,
 		kInt,
 		kEnabledInt,
+// modplus
+// BEGIN **************************************************************
+		kComboBox,
+// END ****************************************************************
 		kReadOnly,
 		kSelectedFilter,
 		kConfirmFile

@@ -45,6 +45,8 @@
 #define BIF_NEWDIALOGSTYLE     0x0040
 #endif
 
+#include <tchar.h>
+
 ///////////////////////////////////////////////////////////////////////////
 
 #if 0
@@ -134,6 +136,12 @@ namespace {
 		void AddLabel(int id, int x, int y, int cx, int cy, const wchar_t *text);
 		void AddCheckbox(int id, int x, int y, int cx, int cy, const wchar_t *text);
 		void AddNumericEdit(int id, int x, int y, int cx, int cy);
+// ********************************************************************
+// *** VirtualDubMod												***
+// *** Cyrius, Oct 2003												***
+// BEGIN **************************************************************
+		void AddComboBox(int id, int x, int y, int cx, int cy, bool Editable);
+// END ****************************************************************
 	};
 
 	DialogTemplateBuilder::DialogTemplateBuilder() {
@@ -216,6 +224,21 @@ namespace {
 		const WORD extradata = 0;
 		push(&extradata, sizeof(WORD));
 	}
+
+// ********************************************************************
+// *** VirtualDubMod												***
+// *** Cyrius, Oct 2003												***
+// BEGIN **************************************************************
+	void DialogTemplateBuilder::AddComboBox(int id, int x, int y, int cx, int cy, bool Editable) {
+		AddControlBase(WS_EX_CLIENTEDGE, WS_CHILD | WS_VISIBLE | (Editable?CBS_DROPDOWN:CBS_DROPDOWNLIST) | WS_VSCROLL | WS_TABSTOP, x, y, cx, cy, id);
+
+		const WORD wclassandtitle[3]={0xffff,0x0085,0x0000};
+		push(wclassandtitle, sizeof wclassandtitle);
+
+		const WORD extradata = 0;
+		push(&extradata, sizeof(WORD));
+	}
+// END ****************************************************************
 
 	void DialogTemplateBuilder::AddNumericEdit(int id, int x, int y, int cx, int cy) {
 		AddControlBase(WS_EX_CLIENTEDGE, WS_CHILD | WS_VISIBLE | ES_NUMBER | WS_TABSTOP, x, y, cx, cy, id);
@@ -326,6 +349,68 @@ struct VDGetFileNameHook {
 				CheckDlgButton(hdlg, id, !!mpOptVals[opt.mDstIdx]);
 				SetDlgItemInt(hdlg, id+1, mpOptVals[opt.mDstIdx+1], TRUE);
 				break;
+// ********************************************************************
+// *** VirtualDubMod												***
+// *** Cyrius, Oct 2003												***
+// BEGIN **************************************************************
+			case VDFileDialogOption::kComboBox:
+				{
+					TCHAR **pValue = (TCHAR **)opt.mpLabel;
+					HWND hWnd = GetDlgItem(hdlg, id);
+					while(pValue && (*++pValue)) {
+						TCHAR *szValue = (*pValue);
+						SendMessage(hWnd, CB_ADDSTRING, 0, (LPARAM)szValue);
+					}
+					SendMessage(hWnd, CB_SETCURSEL, (WPARAM)mpOptVals[opt.mDstIdx], (LPARAM)0);
+					LONG index = SendMessage(hWnd, CB_GETCURSEL, 0, 0);
+					if(index != CB_ERR)
+						mpOptVals[opt.mDstIdx] = index;
+					else
+						mpOptVals[opt.mDstIdx] = 0;
+					//////////////////////////////////
+					RECT wRect;
+					memset(&wRect, 0, sizeof wRect);
+					/*if(*/GetWindowRect(hWnd, &wRect)/*)
+						rPos.bottom = rPos.top + (wRect.bottom - wRect.top)*/;
+					int nPosX = wRect.left;
+					int nPosY = wRect.top;
+					int nWidth = wRect.right - wRect.left;
+					int nHeight = wRect.bottom - wRect.top;
+					int itemHeight = SendMessage(hWnd, CB_GETITEMHEIGHT, 0, 0);
+					int iShownValues = 4;
+					if(itemHeight!=CB_ERR)
+						SetWindowPos(hWnd, HWND_TOP, nPosX, nPosY, nWidth, nHeight+iShownValues*itemHeight+5, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_SHOWWINDOW);
+					int nbItems = SendMessage(hWnd, CB_GETCOUNT, 0, 0);
+					TCHAR szBuf[1024];
+					HGDIOBJ hOld;
+					HDC hDC = GetDC(hWnd);
+					sint32 horExtent = 0;
+					HFONT hFont = (HFONT)SendMessage(hWnd, WM_GETFONT, 0, 0);
+					if(!hFont)
+						hFont = (HFONT)GetStockObject(SYSTEM_FONT);
+					hOld = SelectObject(hDC, hFont);
+					if(nbItems!=CB_ERR) {
+						int iItem = nbItems;
+						while(iItem--) {
+							memset(szBuf, 0, sizeof(szBuf));
+							if(SendMessage(hWnd, CB_GETLBTEXT, (WPARAM)iItem, (LPARAM)szBuf) != CB_ERR) {
+								SIZE newExtent;
+								if(!GetTextExtentPoint32(hDC, szBuf, lstrlen(szBuf), &newExtent))
+									newExtent.cx = 0;
+								if(newExtent.cx > horExtent)
+									horExtent = newExtent.cx;
+							}
+						}
+					}
+					if(iShownValues<nbItems)
+						horExtent += GetSystemMetrics(SM_CXVSCROLL);
+					if(horExtent+5 > nWidth) 
+						SendMessage(hWnd, CB_SETDROPPEDWIDTH, horExtent+5, 0);
+					SelectObject(hDC, hOld);
+					ReleaseDC(hWnd, hDC);
+				}
+				break;
+// END ****************************************************************
 			}
 		}
 	}
@@ -362,6 +447,18 @@ struct VDGetFileNameHook {
 					mpOptVals[opt.mDstIdx+1] = v;
 				}
 				break;
+// ********************************************************************
+// *** VirtualDubMod												***
+// *** Cyrius, Oct 2003												***
+// BEGIN **************************************************************
+			case VDFileDialogOption::kComboBox:
+				{
+					LONG index = SendDlgItemMessage(hdlg, id, CB_GETCURSEL, 0, 0);
+					if(index != CB_ERR)
+						mpOptVals[opt.mDstIdx] = index;
+				}
+				break;
+// END ****************************************************************
 			}
 		}
 		return true;
@@ -415,12 +512,7 @@ static const VDStringW VDGetFileName(bool bSaveAs, long nKey, VDGUIHandle ctxPar
 	ofn.w.nFilterIndex		= 0;
 	ofn.w.lpstrFileTitle	= NULL;
 	ofn.w.lpstrInitialDir	= NULL;
-	ofn.w.Flags				= OFN_PATHMUSTEXIST|OFN_ENABLESIZING|OFN_EXPLORER|OFN_OVERWRITEPROMPT|OFN_HIDEREADONLY;
-
-	if (bSaveAs)
-		ofn.w.Flags |= OFN_OVERWRITEPROMPT;
-	else
-		ofn.w.Flags |= OFN_FILEMUSTEXIST;
+	ofn.w.Flags				= OFN_PATHMUSTEXIST|OFN_FILEMUSTEXIST|OFN_ENABLESIZING|OFN_EXPLORER|OFN_OVERWRITEPROMPT|OFN_HIDEREADONLY;
 
 	DialogTemplateBuilder builder;
 	VDGetFileNameHook hook = { pOptions, pOptVals };
@@ -451,6 +543,27 @@ static const VDStringW VDGetFileName(bool bSaveAs, long nKey, VDGUIHandle ctxPar
 				builder.AddNumericEdit(id+1, 19+sw, y+1, 50, 12);
 				y += 14;
 				break;
+// ********************************************************************
+// *** VirtualDubMod												***
+// *** Cyrius, Oct 2003												***
+// BEGIN **************************************************************
+			case VDFileDialogOption::kComboBox: {
+					const int sw2 = (*(wchar_t **)s) ? 4*wcslen(*(wchar_t **)s) : 0;
+					builder.AddLabel(0, 5, y, sw2, 12, *(wchar_t **)s);
+
+					TCHAR **pValue = (TCHAR **)opt.mpLabel;
+					int w = 0;
+					while(pValue && (*++pValue)) {
+						TCHAR *szValue = (*pValue);
+						if (_tcslen(szValue) > w)
+							w = _tcslen(szValue);
+					}
+
+					builder.AddComboBox(id, 9+sw2, y, (4*w)+5, 12, false);
+					y += 12;
+				}
+				break;
+// END ****************************************************************
 			case VDFileDialogOption::kReadOnly:
 				VDASSERT(nReadOnlyIndex < 0);
 				nReadOnlyIndex = opt.mDstIdx;

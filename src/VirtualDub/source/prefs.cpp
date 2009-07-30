@@ -37,6 +37,11 @@
 #include "dubstatus.h"
 #include "prefs.h"
 
+// modplus
+// BEGIN **************************************************************
+#include "modplus.h"
+// END ****************************************************************
+
 extern HINSTANCE g_hInst;
 
 namespace {
@@ -574,7 +579,13 @@ protected:
 class VDDialogPreferences : public VDDialogBase {
 public:
 	VDPreferences2& mPrefs;
-	VDDialogPreferences(VDPreferences2& p) : mPrefs(p) {}
+// modplus
+// BEGIN **************************************************************
+	VDubModPreferences2& mPrefsMod;
+//	VDDialogPreferences(VDPreferences2& p) : mPrefs(p) {}
+	VDDialogPreferences(VDPreferences2& p, VDubModPreferences2& m) : mPrefs(p), mPrefsMod(m) {}
+// END ****************************************************************
+
 
 	bool HandleUIEvent(IVDUIBase *pBase, IVDUIWindow *pWin, uint32 id, eEventType type, int item) {
 		if (type == kEventAttach) {
@@ -598,6 +609,11 @@ public:
 				case 9:	pSubDialog->SetCallback(new VDDialogPreferencesThreading(mPrefs), true); break;
 				case 10:	pSubDialog->SetCallback(new VDDialogPreferencesPlayback(mPrefs), true); break;
 				case 11:	pSubDialog->SetCallback(new VDDialogPreferencesAccel(mPrefs), true); break;
+// modplus
+// BEGIN **************************************************************
+				case 12:pSubDialog->SetCallback(new VDDialogPrefsScriptEditor(mPrefsMod), true); break;
+				case 13:pSubDialog->SetCallback(new VDDialogPrefsScriptEditorKeys(mPrefsMod), true); break;
+// END ****************************************************************
 				}
 			}
 		} else if (type == kEventSelect) {
@@ -614,6 +630,10 @@ public:
 					pSubDialog->DispatchEvent(vdpoly_cast<IVDUIWindow *>(mpBase), 0, IVDUICallback::kEventSync, 0);
 
 				VDSavePreferences(mPrefs);
+// modplus
+// BEGIN **************************************************************
+				VDMSavePreferences(mPrefsMod);
+// END ****************************************************************
 			}
 		}
 		return false;
@@ -623,9 +643,20 @@ public:
 void VDShowPreferencesDialog(VDGUIHandle h) {
 	vdrefptr<IVDUIWindow> peer(VDUICreatePeer(h));
 
+// modplus
+// BEGIN **************************************************************
+	VDubModPreferences2 mod(g_VDMPrefs2);
+	mod.mModPrefs = g_VDMPrefs;
+	mod.mKeytableAVS = g_accelAVS;
+// END ****************************************************************
+
 	vdrefptr<IVDUIWindow> pWin(VDCreateDialogFromResource(1000, peer));
 	VDPreferences2 temp(g_prefs2);
-	VDDialogPreferences prefDlg(temp);
+// modplus
+// BEGIN **************************************************************
+//	VDDialogPreferences prefDlg(temp);
+	VDDialogPreferences prefDlg(temp, mod);
+// END ****************************************************************
 
 	IVDUIBase *pBase = vdpoly_cast<IVDUIBase *>(pWin);
 	
@@ -638,7 +669,19 @@ void VDShowPreferencesDialog(VDGUIHandle h) {
 	if (result) {
 		g_prefs2 = temp;
 		g_prefs = g_prefs2.mOldPrefs;
+
+// modplus
+// BEGIN **************************************************************
+		g_VDMPrefs2 = mod;
+		g_VDMPrefs = mod.mModPrefs;
+		g_accelAVS = mod.mKeytableAVS;
+// END ****************************************************************
+
 		VDPreferencesUpdated();
+// modplus
+// BEGIN **************************************************************
+		VDMPreferencesUpdated();
+// END ****************************************************************
 	}
 }
 
@@ -744,6 +787,10 @@ void VDSavePreferences(VDPreferences2& prefs) {
 
 void VDSavePreferences() {
 	VDSavePreferences(g_prefs2);
+// modplus
+// BEGIN **************************************************************
+	VDMSavePreferences(g_VDMPrefs2);
+// END ****************************************************************
 }
 
 const VDStringW& VDPreferencesGetTimelineFormat() {

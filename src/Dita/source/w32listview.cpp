@@ -376,6 +376,12 @@ void VDUIListViewW32::OnNotifyCallback(const NMHDR *pHdr) {
 			}
 		}
 	}
+// modplus
+// BEGIN **************************************************************
+	if (pHdr->code == NM_DBLCLK) {
+		mpBase->DispatchEvent(this, mID, IVDUICallback::kEventDoubleClick, mSelected);
+	}
+// END ****************************************************************
 }
 
 void VDUIListViewW32::OnResize() {

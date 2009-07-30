@@ -90,6 +90,10 @@ protected:
 
 	LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	LRESULT MainWndProc( UINT msg, WPARAM wParam, LPARAM lParam);
+// modplus
+// BEGIN **************************************************************
+	LRESULT MainWndProcMod( UINT msg, WPARAM wParam, LPARAM lParam, bool& isBreak);
+// END ****************************************************************
 	LRESULT DubWndProc(UINT msg, WPARAM wParam, LPARAM lParam);
 	void OnPositionNotify(int cmd);
 	void OnSize();

@@ -71,6 +71,11 @@
 #include "version.h"
 #include "FilterInstance.h"
 
+// modplus
+// BEGIN **************************************************************
+#include "modplus.h"
+// END ****************************************************************
+
 ///////////////////////////////////////////////////////////////////////////
 
 extern void InitBuiltinFilters();
@@ -375,6 +380,10 @@ bool Init(HINSTANCE hInstance, int nCmdShow, VDCommandLine& cmdLine) {
 	VDLoadFilespecSystemData();
 
 	LoadPreferences();
+// modplus
+// BEGIN **************************************************************
+	LoadPreferencesMod();
+// END ****************************************************************
 	{
 		VDRegistryAppKey key("Preferences");
 		unsigned errorMode;
@@ -519,6 +528,11 @@ void Deinit() {
 
 	AVIFileExit();
 
+// modplus
+// BEGIN **************************************************************
+	DeinitMod();
+// END ****************************************************************
+
 	_CrtCheckMemory();
 
 	VDCHECKPOINT;
@@ -559,6 +573,11 @@ bool InitApplication(HINSTANCE hInstance) {
 
 	extern bool VDUIRegisterHotKeyExControl();
 	if (!VDUIRegisterHotKeyExControl()) return false;
+
+// modplus
+// BEGIN **************************************************************
+	InitApplicationMod(hInstance);
+// END ****************************************************************
 
 	return true;
 }

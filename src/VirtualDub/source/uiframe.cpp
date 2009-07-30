@@ -23,6 +23,11 @@
 #include "resource.h"
 #include "gui.h"
 
+// modplus
+// BEGIN **************************************************************
+#include "modplus.h"
+// END ****************************************************************
+
 #if defined(_MSC_VER) && _MSC_VER < 1400
 	#pragma optimize("a", off)		// Needs to be off or compiler thinks 'this' can't be aliased through mhwnd
 #endif
@@ -220,6 +225,11 @@ bool VDUIFrame::TranslateAcceleratorMessage(MSG& msg) {
 		return false;
 
 	HWND hwnd = VDGetAncestorW32(msg.hwnd, GA_ROOT);
+
+// modplus
+// BEGIN **************************************************************
+	if (TranslateAcceleratorAvs(hwnd, msg)) return true;
+// END ****************************************************************
 
 	ATOM a = (ATOM)GetClassLongPtr(hwnd, GCW_ATOM);
 
