@@ -1,13 +1,13 @@
 
-VirtualDub-1.7 + VirtualDubMod + α patch
+VirtualDub + VirtualDubMod + α patch
 
 
 パッチ内容:
-	VirtualDub-1.7へのVirtualDubMod-1.5.10.2+機能(一部)の移植。
+	VirtualDubへのVirtualDubMod-1.5.10.2+機能(一部)の移植。
 	その他機能追加、修正。
 
 	AviSynthLexer.lexer、SciLexer.dllは VirtualDubMod 1.5.10.2 から持ってきています。
-	VirtualDub-1.7.8-src.7zがベースです。modのソースはCVSから持ってきました。
+	その他modのソースはCVSから持ってきました。
 
 
 使用方法:
@@ -16,6 +16,9 @@ VirtualDub-1.7 + VirtualDubMod + α patch
 
 
 変更履歴:
+	2009/XX/XX plus-0.7
+	・ベースのソースをVirtualDub-1.9.4に変更。
+
 	2008/03/04 plus-0.6
 	・エディタ上の文字検索を追加。
 	・Autopopupが有効でavsファイルをドラッグした場合に、エディタ画面が常に上になってしまうのを修正。
